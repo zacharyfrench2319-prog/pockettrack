@@ -13,7 +13,7 @@ serve(async (req) => {
   }
 
   try {
-    const { image_base64, user_id } = await req.json();
+    const { image_base64, user_id, user_reasoning } = await req.json();
     if (!image_base64 || !user_id) {
       return new Response(
         JSON.stringify({ error: "Missing image or user_id" }),
@@ -24,7 +24,6 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    // Fetch user financial context from Supabase
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
@@ -32,14 +31,14 @@ serve(async (req) => {
     // Get profile
     const { data: profile } = await supabase
       .from("profiles")
-      .select("monthly_income, saving_goal, display_name")
+      .select("monthly_income, saving_goal, display_name, pay_frequency, next_pay_date, spending_concerns, personal_context")
       .eq("user_id", user_id)
       .single();
 
     // Get transactions for context
     const now = new Date();
     const weekStart = new Date(now);
-    weekStart.setDate(now.getDate() - now.getDay() + 1); // Monday
+    weekStart.setDate(now.getDate() - now.getDay() + 1);
     const weekStartStr = weekStart.toISOString().split("T")[0];
     const monthStartStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
 
@@ -78,15 +77,31 @@ serve(async (req) => {
 
     const monthlyIncome = profile?.monthly_income || 0;
     const savingFor = profile?.saving_goal || "not specified";
+    const payFrequency = profile?.pay_frequency || "not specified";
+    const nextPayDate = profile?.next_pay_date || "not specified";
+    const spendingConcerns = profile?.spending_concerns?.join(", ") || "none specified";
+    const personalContext = profile?.personal_context || "";
 
-    const financialContext = `
+    let financialContext = `
 Monthly income: $${monthlyIncome}
 Current balance: $${balance.toFixed(2)}
 Weekly spending so far: $${weeklySpend.toFixed(2)}
 Monthly spending so far: $${monthlySpend.toFixed(2)}
+Pay frequency: ${payFrequency}
+Next pay date: ${nextPayDate}
 Saving for: ${savingFor}
 Active savings goals: ${goalsContext || "none"}
+Spending concerns: ${spendingConcerns}
     `.trim();
+
+    if (personalContext) {
+      financialContext += `\n\nPersonal context from user: "${personalContext}"`;
+    }
+
+    let reasoningSection = "";
+    if (user_reasoning) {
+      reasoningSection = `\n\nThe user provided this reason for wanting to buy it: "${user_reasoning}"\nFactor this into your advice. If they have a legitimate need, weigh that against their finances.`;
+    }
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -104,7 +119,7 @@ Active savings goals: ${goalsContext || "none"}
                 type: "text",
                 text: `You are a smart financial advisor helping someone decide whether to buy something. Identify the product and its approximate price from the image. Consider their financial situation:
 
-${financialContext}
+${financialContext}${reasoningSection}
 
 Return JSON only, no other text:
 {
@@ -173,7 +188,6 @@ Be personal and direct. Reference their actual numbers. For example: "You've alr
       );
     }
 
-    // Include financial context in response for the UI
     extracted.context = {
       weekly_spend: weeklySpend,
       balance,

@@ -5,6 +5,7 @@ import { useSubscription } from "@/contexts/SubscriptionContext";
 import CATEGORY_META from "@/lib/categories";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, Camera, Upload, Loader2, Check, X, Receipt, ShoppingBag, Lightbulb, ThumbsUp, ThumbsDown } from "lucide-react";
 import { format, startOfMonth } from "date-fns";
@@ -74,6 +75,11 @@ const Scan = () => {
   const [productResult, setProductResult] = useState<ProductResult | null>(null);
   const [dismissed, setDismissed] = useState(false);
 
+  // Reasoning step state
+  const [showReasoningStep, setShowReasoningStep] = useState(false);
+  const [identifiedProduct, setIdentifiedProduct] = useState<{ name: string; price: number } | null>(null);
+  const [userReasoning, setUserReasoning] = useState("");
+
   // Check scan count for free users
   useEffect(() => {
     const checkScanCount = async () => {
@@ -127,6 +133,9 @@ const Scan = () => {
     setReceiptResult(null);
     setProductResult(null);
     setDismissed(false);
+    setShowReasoningStep(false);
+    setIdentifiedProduct(null);
+    setUserReasoning("");
   };
 
   const clearImage = () => {
@@ -197,16 +206,47 @@ const Scan = () => {
     setEditItems((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // ── Product scan ───────────────────────────────────────
-  const handleProductScan = async () => {
+  // ── Product scan — Step 1: Identify product ──────────
+  const handleProductIdentify = async () => {
     if (!imageBase64) return;
     setScanning(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
+      // Quick identification call
       const { data, error } = await supabase.functions.invoke("scan-product", {
         body: { image_base64: imageBase64, user_id: user.id },
+      });
+      if (error) throw error;
+      if (data.error) throw new Error(data.error);
+
+      // Show reasoning step with identified product
+      setIdentifiedProduct({ name: data.product_name, price: data.estimated_price });
+      setProductResult(data);
+      setShowReasoningStep(true);
+    } catch (e: any) {
+      toast.error(e.message || "Failed to identify product");
+    }
+    setScanning(false);
+  };
+
+  // ── Product scan — Step 2: Get advice with reasoning ──
+  const handleGetAdvice = async () => {
+    if (!imageBase64 || !identifiedProduct) return;
+    setScanning(true);
+    setShowReasoningStep(false);
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const { data, error } = await supabase.functions.invoke("scan-product", {
+        body: {
+          image_base64: imageBase64,
+          user_id: user.id,
+          user_reasoning: userReasoning.trim() || undefined,
+        },
       });
       if (error) throw error;
       if (data.error) throw new Error(data.error);
@@ -279,8 +319,56 @@ const Scan = () => {
     );
   }
 
+  // ── RENDER: Reasoning Step ────────────────────────────
+  if (mode === "should_i_buy" && showReasoningStep && identifiedProduct) {
+    return (
+      <div className="min-h-screen flex flex-col px-5 pt-14 pb-8">
+        <button onClick={reset} className="flex items-center gap-2 text-muted-foreground mb-6">
+          <ArrowLeft size={20} /><span className="text-[15px]">Start Over</span>
+        </button>
+
+        <div className="space-y-4 flex-1">
+          {/* Product identified */}
+          <div className="rounded-2xl bg-card p-5 text-center space-y-2" style={{ boxShadow: "var(--card-shadow)" }}>
+            <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Product Detected</p>
+            <h2 className="text-xl font-bold text-foreground">{identifiedProduct.name}</h2>
+            <p className="text-2xl font-bold text-foreground">
+              ${identifiedProduct.price.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+            </p>
+          </div>
+
+          {/* User reasoning input */}
+          <div className="rounded-2xl bg-card p-5 space-y-3" style={{ boxShadow: "var(--card-shadow)" }}>
+            <label className="text-[15px] font-semibold text-foreground">Any reason you need this?</label>
+            <Textarea
+              placeholder="e.g. My current phone is broken, I need a new one for work"
+              value={userReasoning}
+              onChange={(e) => setUserReasoning(e.target.value)}
+              className="min-h-[100px] rounded-xl bg-muted border-0 text-[14px] placeholder:text-muted-foreground resize-none"
+            />
+            <p className="text-[11px] text-muted-foreground">Leave blank if no specific reason — the AI will just use your financial data.</p>
+          </div>
+
+          <Button onClick={handleGetAdvice} className="w-full h-12 rounded-xl text-[15px] font-semibold">
+            Get Advice
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── RENDER: Scanning after reasoning ──────────────────
+  if (mode === "should_i_buy" && scanning && !showReasoningStep && identifiedProduct) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center px-5">
+        <Loader2 size={28} className="text-primary animate-spin" />
+        <p className="text-sm text-muted-foreground mt-3">Getting personalised advice...</p>
+      </div>
+    );
+  }
+
   // ── RENDER: Product Verdict ────────────────────────────
-  if (mode === "should_i_buy" && productResult) {
+  if (mode === "should_i_buy" && productResult && !showReasoningStep) {
     if (dismissed) {
       return (
         <div className="min-h-screen flex flex-col items-center justify-center px-5">
@@ -432,8 +520,8 @@ const Scan = () => {
   const isProduct = mode === "should_i_buy";
   const title = isProduct ? "Should I Buy This?" : "Scan Receipt";
   const subtitle = isProduct ? "Take a photo of something you're thinking of buying" : "Take a photo or upload a receipt image";
-  const loadingText = isProduct ? "Analysing purchase..." : "Scanning receipt...";
-  const scanHandler = isProduct ? handleProductScan : handleReceiptScan;
+  const loadingText = isProduct ? "Identifying product..." : "Scanning receipt...";
+  const scanHandler = isProduct ? handleProductIdentify : handleReceiptScan;
 
   return (
     <div className="min-h-screen flex flex-col px-5 pt-14 pb-8">
@@ -461,7 +549,7 @@ const Scan = () => {
               <div className="flex gap-3">
                 <Button variant="outline" onClick={clearImage} className="flex-1 h-12 rounded-xl text-[14px]">Retake</Button>
                 <Button onClick={scanHandler} className="flex-1 h-12 rounded-xl text-[15px] font-semibold">
-                  {isProduct ? "Analyse" : "Scan Now"}
+                  {isProduct ? "Identify Product" : "Scan Now"}
                 </Button>
               </div>
             )}

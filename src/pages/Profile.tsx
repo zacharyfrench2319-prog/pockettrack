@@ -8,8 +8,8 @@ import { Input } from "@/components/ui/input";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import Logo from "@/components/Logo";
-import UpgradeModal from "@/components/UpgradeModal";
 import ConnectedAccountsSection from "@/components/ConnectedAccountsSection";
+import MemorySection from "@/components/MemorySection";
 
 const Profile = () => {
   const navigate = useNavigate();
@@ -20,7 +20,6 @@ const Profile = () => {
   const [displayName, setDisplayName] = useState("");
   const [editingName, setEditingName] = useState(false);
   const [isDark, setIsDark] = useState(true);
-  const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [redeemOpen, setRedeemOpen] = useState(false);
   const [redeemCode, setRedeemCode] = useState("");
   const [checkoutLoading, setCheckoutLoading] = useState(false);
@@ -29,23 +28,42 @@ const Profile = () => {
   const [bankConnected, setBankConnected] = useState(false);
   const [bankName, setBankName] = useState<string | null>(null);
 
+  // Memory fields
+  const [monthlyIncome, setMonthlyIncome] = useState<number | null>(null);
+  const [payFrequency, setPayFrequency] = useState<string | null>(null);
+  const [nextPayDate, setNextPayDate] = useState<string | null>(null);
+  const [spendingConcerns, setSpendingConcerns] = useState<string[] | null>(null);
+  const [personalContext, setPersonalContext] = useState<string | null>(null);
+  const [savingGoal, setSavingGoal] = useState<string | null>(null);
+
+  const loadProfile = useCallback(async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    setEmail(user.email || "");
+    const { data } = await supabase
+      .from("profiles")
+      .select("display_name, bank_connected, bank_name, monthly_income, saving_goal, pay_frequency, next_pay_date, spending_concerns, personal_context")
+      .eq("user_id", user.id)
+      .single();
+    if (data) {
+      setDisplayName((data as any).display_name || "");
+      setBankConnected(!!(data as any).bank_connected);
+      setBankName((data as any).bank_name || null);
+      setMonthlyIncome((data as any).monthly_income);
+      setPayFrequency((data as any).pay_frequency || null);
+      setNextPayDate((data as any).next_pay_date || null);
+      setSpendingConcerns((data as any).spending_concerns || null);
+      setPersonalContext((data as any).personal_context || null);
+      setSavingGoal((data as any).saving_goal || null);
+    }
+  }, []);
+
   useEffect(() => {
     const dark = document.documentElement.classList.contains("dark");
     setIsDark(dark);
+    loadProfile();
+  }, [loadProfile]);
 
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) {
-        setEmail(user.email || "");
-        supabase.from("profiles").select("display_name, bank_connected, bank_name").eq("user_id", user.id).single().then(({ data }) => {
-          if (data?.display_name) setDisplayName(data.display_name);
-          setBankConnected(!!(data as any)?.bank_connected);
-          setBankName((data as any)?.bank_name || null);
-        });
-      }
-    });
-  }, []);
-
-  // Check for success redirect
   useEffect(() => {
     if (searchParams.get("success") === "true") {
       toast.success("Welcome to PocketTrack Pro! 🎉");
@@ -103,7 +121,6 @@ const Profile = () => {
   };
 
   const handleExport = async () => {
-    if (!isPro) { setUpgradeOpen(true); return; }
     setExportLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { setExportLoading(false); return; }
@@ -140,7 +157,6 @@ const Profile = () => {
   const handleDeleteAccount = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
-    // Delete user data then sign out
     await Promise.all([
       supabase.from("transactions").delete().eq("user_id", user.id),
       supabase.from("savings_goals").delete().eq("user_id", user.id),
@@ -160,7 +176,7 @@ const Profile = () => {
         {isPro && (
           <div className="flex items-center gap-1.5 bg-primary/15 px-3 py-1 rounded-full">
             <Sparkles size={14} className="text-primary" />
-            <span className="text-xs font-semibold text-primary">Pro</span>
+            <span className="text-xs font-semibold text-primary">Pro Active</span>
           </div>
         )}
       </div>
@@ -219,31 +235,40 @@ const Profile = () => {
             <span className="flex-1 text-[15px] text-foreground text-left">Edit Profile</span>
             <ChevronRight size={16} className="text-muted-foreground" />
           </button>
-          <button onClick={isPro ? handleManageSub : handleUpgrade} className="w-full flex items-center gap-3 px-5 py-3.5 hover:bg-muted/50 transition-colors border-t border-border/40">
-            <CreditCard size={20} className="text-muted-foreground" />
-            <span className="flex-1 text-[15px] text-foreground text-left">
-              {isPro ? "Manage Subscription" : "Upgrade to Pro"}
-            </span>
-            <span className="text-xs text-muted-foreground">{isPro ? "Pro" : "Free"}</span>
-            <ChevronRight size={16} className="text-muted-foreground" />
-          </button>
+          {isPro ? (
+            <button onClick={handleManageSub} className="w-full flex items-center gap-3 px-5 py-3.5 hover:bg-muted/50 transition-colors border-t border-border/40">
+              <CreditCard size={20} className="text-muted-foreground" />
+              <span className="flex-1 text-[15px] text-foreground text-left">Manage Subscription</span>
+              <span className="text-xs text-primary font-medium">Pro</span>
+              <ChevronRight size={16} className="text-muted-foreground" />
+            </button>
+          ) : (
+            <button onClick={handleUpgrade} className="w-full flex items-center gap-3 px-5 py-3.5 hover:bg-muted/50 transition-colors border-t border-border/40">
+              <CreditCard size={20} className="text-muted-foreground" />
+              <span className="flex-1 text-[15px] text-foreground text-left">Upgrade to Pro</span>
+              <span className="text-xs text-muted-foreground">Free</span>
+              <ChevronRight size={16} className="text-muted-foreground" />
+            </button>
+          )}
         </div>
       </div>
+
+      {/* MEMORY section */}
+      <MemorySection
+        monthlyIncome={monthlyIncome}
+        payFrequency={payFrequency}
+        nextPayDate={nextPayDate}
+        spendingConcerns={spendingConcerns}
+        personalContext={personalContext}
+        savingGoal={savingGoal}
+        onUpdated={loadProfile}
+      />
 
       {/* CONNECTED ACCOUNTS section */}
       <ConnectedAccountsSection
         bankConnected={bankConnected}
         bankName={bankName}
-        onStatusChange={() => {
-          supabase.auth.getUser().then(({ data: { user } }) => {
-            if (user) {
-              supabase.from("profiles").select("bank_connected, bank_name").eq("user_id", user.id).single().then(({ data }) => {
-                setBankConnected(!!(data as any)?.bank_connected);
-                setBankName((data as any)?.bank_name || null);
-              });
-            }
-          });
-        }}
+        onStatusChange={() => loadProfile()}
       />
 
       {/* PREFERENCES section */}
@@ -297,30 +322,30 @@ const Profile = () => {
       </div>
 
       {/* Redeem Code */}
-      <div className="flex justify-center pt-2">
-        {!redeemOpen ? (
-          <button onClick={() => setRedeemOpen(true)} className="text-[12px] text-muted-foreground/50 hover:text-muted-foreground transition-colors">
-            Redeem Code
-          </button>
-        ) : (
-          <div className="flex items-center gap-2">
-            <Input
-              value={redeemCode}
-              onChange={(e) => setRedeemCode(e.target.value.toUpperCase())}
-              placeholder="Enter code"
-              className="h-8 w-40 rounded-lg bg-secondary border-0 text-xs text-center"
-              onKeyDown={(e) => e.key === "Enter" && handleRedeem()}
-            />
-            <Button size="sm" variant="ghost" onClick={handleRedeem} className="h-8 text-xs">Apply</Button>
-          </div>
-        )}
-      </div>
+      {!isPro && (
+        <div className="flex justify-center pt-2">
+          {!redeemOpen ? (
+            <button onClick={() => setRedeemOpen(true)} className="text-[12px] text-muted-foreground/50 hover:text-muted-foreground transition-colors">
+              Redeem Code
+            </button>
+          ) : (
+            <div className="flex items-center gap-2">
+              <Input
+                value={redeemCode}
+                onChange={(e) => setRedeemCode(e.target.value.toUpperCase())}
+                placeholder="Enter code"
+                className="h-8 w-40 rounded-lg bg-secondary border-0 text-xs text-center"
+                onKeyDown={(e) => e.key === "Enter" && handleRedeem()}
+              />
+              <Button size="sm" variant="ghost" onClick={handleRedeem} className="h-8 text-xs">Apply</Button>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="flex justify-center pt-2 pb-4">
         <Logo />
       </div>
-
-      <UpgradeModal open={upgradeOpen} onOpenChange={setUpgradeOpen} feature="CSV export" />
     </div>
   );
 };
