@@ -312,7 +312,10 @@ const Scan = () => {
           </div>
 
           {/* Verdict Badge */}
-          <div className={`rounded-xl ${verdict.bg} p-4 text-center`}>
+          <div
+            className={`rounded-xl ${verdict.bg} p-4 text-center animate-fade-in`}
+            style={{ animationDelay: "200ms", animationFillMode: "both" }}
+          >
             <p className={`text-lg font-bold ${verdict.text}`}>{verdict.label}</p>
           </div>
 

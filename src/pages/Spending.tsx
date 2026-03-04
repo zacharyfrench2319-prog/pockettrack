@@ -3,10 +3,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { getCategoryMeta } from "@/lib/categories";
 import CATEGORY_META from "@/lib/categories";
+import { formatAUD, formatSmartDate } from "@/lib/formatters";
 import AddTransactionSheet from "@/components/AddTransactionSheet";
 import TransactionDetailSheet from "@/components/TransactionDetailSheet";
 import AddSubscriptionSheet from "@/components/AddSubscriptionSheet";
 import SubscriptionsList from "@/components/SubscriptionsList";
+import { TransactionListSkeleton } from "@/components/Skeletons";
 import { Plus, Search, ChevronDown, ChevronUp, Lock, Landmark } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell } from "recharts";
 import { format, parseISO, startOfMonth } from "date-fns";
@@ -69,7 +71,6 @@ const Spending = () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    // Group expenses by merchant (case-insensitive)
     const expenses = transactions.filter((t) => t.type === "expense" && t.merchant);
     const groups: Record<string, Transaction[]> = {};
     expenses.forEach((t) => {
@@ -85,13 +86,11 @@ const Spending = () => {
     for (const [, txs] of Object.entries(groups)) {
       if (txs.length < 2) continue;
 
-      // Check amount variance (within 10%)
       const amounts = txs.map((t) => t.amount);
       const avgAmount = amounts.reduce((a, b) => a + b, 0) / amounts.length;
       const withinVariance = amounts.every((a) => Math.abs(a - avgAmount) / avgAmount <= 0.1);
       if (!withinVariance) continue;
 
-      // Check regularity by sorting dates and checking intervals
       const dates = txs.map((t) => parseISO(t.date).getTime()).sort((a, b) => a - b);
       const intervals: number[] = [];
       for (let i = 1; i < dates.length; i++) {
@@ -118,9 +117,11 @@ const Spending = () => {
     }
 
     if (newSubs.length > 0) {
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (!currentUser) return;
       const { error } = await supabase.from("subscriptions").insert(
         newSubs.map((s) => ({
-          user_id: user.id,
+          user_id: currentUser.id,
           name: s.name,
           amount: s.amount,
           category: s.category,
@@ -135,21 +136,17 @@ const Spending = () => {
 
   useEffect(() => { loadTransactions(); }, [loadTransactions]);
 
-  // When subscriptions tab is selected, load + detect
   useEffect(() => {
     if (filter === "subscriptions" && isPro) {
-      loadSubscriptions().then(() => {
-        // Detect runs after subs are loaded
-      });
+      loadSubscriptions();
     }
   }, [filter, isPro, loadSubscriptions]);
 
-  // Run detection after subs load
   useEffect(() => {
     if (filter === "subscriptions" && isPro && transactions.length > 0) {
       detectSubscriptions();
     }
-  }, [filter, isPro, transactions.length]); // intentionally not including detectSubscriptions to avoid loops
+  }, [filter, isPro, transactions.length]);
 
   const filtered = useMemo(() => {
     let list = transactions;
@@ -168,9 +165,9 @@ const Spending = () => {
   }, [transactions, filter, search]);
 
   const categoryBreakdown = useMemo(() => {
-    const monthStart = startOfMonth(new Date());
+    const ms = startOfMonth(new Date());
     const monthExpenses = transactions.filter(
-      (t) => t.type === "expense" && parseISO(t.date) >= monthStart
+      (t) => t.type === "expense" && parseISO(t.date) >= ms
     );
     const total = monthExpenses.reduce((s, t) => s + t.amount, 0);
     const byCategory: Record<string, number> = {};
@@ -264,8 +261,7 @@ const Spending = () => {
       {/* SUBSCRIPTIONS TAB */}
       {isSubsTab ? (
         !isPro ? (
-          /* Pro Gate */
-          <div className="rounded-2xl bg-card p-8 flex flex-col items-center text-center space-y-4" style={{ boxShadow: "var(--card-shadow)" }}>
+          <div className="rounded-2xl bg-card p-8 flex flex-col items-center text-center space-y-4 animate-fade-in" style={{ boxShadow: "var(--card-shadow)" }}>
             <div className="w-16 h-16 rounded-2xl bg-primary/15 flex items-center justify-center">
               <Lock size={28} className="text-primary" />
             </div>
@@ -277,6 +273,12 @@ const Spending = () => {
               Upgrade to Pro
             </Button>
           </div>
+        ) : subscriptions.length === 0 ? (
+          <div className="rounded-2xl bg-card p-8 flex flex-col items-center text-center space-y-4 animate-fade-in" style={{ boxShadow: "var(--card-shadow)" }}>
+            <div className="text-5xl">🔄</div>
+            <h3 className="text-lg font-semibold text-foreground">No subscriptions detected yet</h3>
+            <p className="text-sm text-muted-foreground">Add transactions to start — we'll automatically detect recurring charges</p>
+          </div>
         ) : (
           <SubscriptionsList
             subscriptions={subscriptions}
@@ -287,14 +289,21 @@ const Spending = () => {
         <>
           {/* Transaction List */}
           {loading ? (
-            <div className="flex justify-center py-8">
-              <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-            </div>
+            <TransactionListSkeleton />
           ) : filtered.length === 0 ? (
-            <div className="rounded-2xl bg-card p-6 text-center" style={{ boxShadow: "var(--card-shadow)" }}>
+            <div className="rounded-2xl bg-card p-8 flex flex-col items-center text-center space-y-4 animate-fade-in" style={{ boxShadow: "var(--card-shadow)" }}>
+              <div className="text-5xl">📝</div>
+              <h3 className="text-lg font-semibold text-foreground">
+                {search || filter !== "all" ? "No matching transactions" : "No transactions yet"}
+              </h3>
               <p className="text-sm text-muted-foreground">
-                {search || filter !== "all" ? "No matching transactions" : "No transactions yet. Tap + to add one!"}
+                {search || filter !== "all" ? "Try a different search or filter" : "Tap + to add your first transaction"}
               </p>
+              {!search && filter === "all" && (
+                <Button onClick={() => setAddOpen(true)} className="rounded-xl h-11 px-6 text-[14px] font-semibold">
+                  <Plus size={16} className="mr-1" /> Add Transaction
+                </Button>
+              )}
             </div>
           ) : (
             <div className="rounded-2xl bg-card overflow-hidden" style={{ boxShadow: "var(--card-shadow)" }}>
@@ -305,9 +314,10 @@ const Spending = () => {
                   <button
                     key={tx.id}
                     onClick={() => { setDetailTx(tx); setDetailOpen(true); }}
-                    className={`w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-muted/30 transition-colors ${
+                    className={`w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-muted/30 transition-colors animate-fade-in ${
                       i < filtered.length - 1 ? "border-b border-border/40" : ""
                     }`}
+                    style={{ animationDelay: `${i * 40}ms`, animationFillMode: "both" }}
                   >
                     <div
                       className="w-9 h-9 rounded-full flex items-center justify-center text-sm shrink-0 relative"
@@ -328,9 +338,9 @@ const Spending = () => {
                     </div>
                     <div className="text-right shrink-0">
                       <p className={`text-[15px] font-semibold ${isIncome ? "text-success" : "text-destructive"}`}>
-                        {isIncome ? "+" : "-"}${tx.amount.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                        {isIncome ? "+" : "-"}{formatAUD(tx.amount)}
                       </p>
-                      <p className="text-[11px] text-muted-foreground">{format(parseISO(tx.date), "MMM d")}</p>
+                      <p className="text-[11px] text-muted-foreground">{formatSmartDate(tx.date)}</p>
                     </div>
                   </button>
                 );
@@ -340,7 +350,7 @@ const Spending = () => {
 
           {/* Category Breakdown */}
           {categoryBreakdown.length > 0 && (
-            <div className="space-y-2">
+            <div className="space-y-2 animate-fade-in" style={{ animationDelay: "200ms", animationFillMode: "both" }}>
               <button
                 onClick={() => setBreakdownOpen(!breakdownOpen)}
                 className="flex items-center justify-between w-full"
@@ -367,7 +377,7 @@ const Spending = () => {
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="text-[13px] font-semibold text-foreground">
-                            ${item.amount.toLocaleString("en-US", { minimumFractionDigits: 0 })}
+                            {formatAUD(item.amount, 0)}
                           </span>
                           <span className="text-[11px] text-muted-foreground">{item.percent}%</span>
                         </div>
@@ -387,7 +397,7 @@ const Spending = () => {
 
           {/* Monthly Comparison */}
           {monthlyData.length > 1 && (
-            <div className="space-y-3">
+            <div className="space-y-3 animate-fade-in" style={{ animationDelay: "300ms", animationFillMode: "both" }}>
               <h2 className="text-lg font-semibold text-foreground">Monthly Comparison</h2>
               <div className="rounded-2xl bg-card p-5" style={{ boxShadow: "var(--card-shadow)" }}>
                 <div className="h-40">
