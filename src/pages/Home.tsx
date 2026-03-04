@@ -39,6 +39,7 @@ const Home = () => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [primaryGoal, setPrimaryGoal] = useState<SavingsGoal | null | undefined>(undefined);
+  const [subsTotal, setSubsTotal] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [addOpen, setAddOpen] = useState(false);
 
@@ -46,15 +47,24 @@ const Home = () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    const [profileRes, txRes, goalsRes] = await Promise.all([
+    const [profileRes, txRes, goalsRes, subsRes] = await Promise.all([
       supabase.from("profiles").select("display_name, monthly_income").eq("user_id", user.id).single(),
       supabase.from("transactions").select("*").eq("user_id", user.id).order("date", { ascending: false }).limit(100),
       supabase.from("savings_goals").select("*").eq("user_id", user.id).order("created_at", { ascending: true }).limit(1),
+      supabase.from("subscriptions").select("amount, frequency").eq("user_id", user.id).eq("is_active", true),
     ]);
 
     if (profileRes.data) setProfile(profileRes.data);
     if (txRes.data) setTransactions(txRes.data);
     setPrimaryGoal(goalsRes.data && goalsRes.data.length > 0 ? goalsRes.data[0] : null);
+    if (subsRes.data) {
+      const total = subsRes.data.reduce((sum, s) => {
+        if (s.frequency === "yearly") return sum + (s.amount as number) / 12;
+        if (s.frequency === "weekly") return sum + (s.amount as number) * 4.33;
+        return sum + (s.amount as number);
+      }, 0);
+      setSubsTotal(total);
+    }
     setLoading(false);
   }, []);
 
@@ -202,6 +212,23 @@ const Home = () => {
               </div>
             ))}
           </div>
+
+          {/* Subscriptions stat */}
+          {subsTotal > 0 && (
+            <div
+              onClick={() => navigate("/spending")}
+              className="rounded-2xl bg-card p-3.5 flex items-center justify-between cursor-pointer active:scale-[0.98] transition-transform"
+              style={{ boxShadow: "var(--card-shadow)" }}
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-base">🔄</span>
+                <p className="text-[13px] text-muted-foreground font-medium">Subscriptions</p>
+              </div>
+              <p className="text-[15px] font-bold text-foreground">
+                ${subsTotal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/mo
+              </p>
+            </div>
+          )}
 
           {/* Spending Chart */}
           <SpendingChart dailyData={dailyChartData} weeklyData={weeklyChartData} />
