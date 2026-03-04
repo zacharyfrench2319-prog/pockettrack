@@ -1,10 +1,11 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { getCategoryMeta } from "@/lib/categories";
 import SpendingChart from "@/components/SpendingChart";
+import AddTransactionSheet from "@/components/AddTransactionSheet";
 import Logo from "@/components/Logo";
-import { Camera } from "lucide-react";
+import { Camera, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { format, startOfWeek, endOfWeek, startOfMonth, subDays, isToday, parseISO } from "date-fns";
 
@@ -28,23 +29,23 @@ const Home = () => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [addOpen, setAddOpen] = useState(false);
 
-  useEffect(() => {
-    const load = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+  const loadData = useCallback(async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
 
-      const [profileRes, txRes] = await Promise.all([
-        supabase.from("profiles").select("display_name, monthly_income").eq("user_id", user.id).single(),
-        supabase.from("transactions").select("*").eq("user_id", user.id).order("date", { ascending: false }).limit(100),
-      ]);
+    const [profileRes, txRes] = await Promise.all([
+      supabase.from("profiles").select("display_name, monthly_income").eq("user_id", user.id).single(),
+      supabase.from("transactions").select("*").eq("user_id", user.id).order("date", { ascending: false }).limit(100),
+    ]);
 
-      if (profileRes.data) setProfile(profileRes.data);
-      if (txRes.data) setTransactions(txRes.data);
-      setLoading(false);
-    };
-    load();
+    if (profileRes.data) setProfile(profileRes.data);
+    if (txRes.data) setTransactions(txRes.data);
+    setLoading(false);
   }, []);
+
+  useEffect(() => { loadData(); }, [loadData]);
 
   const now = new Date();
   const todayStr = format(now, "yyyy-MM-dd");
@@ -196,12 +197,20 @@ const Home = () => {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-foreground">Recent</h2>
-              <button
-                onClick={() => navigate("/spending")}
-                className="text-sm text-primary font-medium"
-              >
-                See All
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setAddOpen(true)}
+                  className="w-7 h-7 rounded-lg bg-primary/15 flex items-center justify-center"
+                >
+                  <Plus size={16} className="text-primary" />
+                </button>
+                <button
+                  onClick={() => navigate("/spending")}
+                  className="text-sm text-primary font-medium"
+                >
+                  See All
+                </button>
+              </div>
             </div>
 
             <div className="rounded-2xl bg-card overflow-hidden" style={{ boxShadow: "var(--card-shadow)" }}>
@@ -239,6 +248,8 @@ const Home = () => {
           </div>
         </>
       )}
+
+      <AddTransactionSheet open={addOpen} onOpenChange={setAddOpen} onSaved={loadData} />
     </div>
   );
 };
