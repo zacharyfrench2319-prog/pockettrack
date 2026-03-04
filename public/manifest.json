@@ -1,0 +1,16 @@
+{
+  "name": "PocketTrack",
+  "short_name": "PocketTrack",
+  "description": "AI-powered expense tracker and financial advisor",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0F0F12",
+  "theme_color": "#A78BFA",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "64x64",
+      "type": "image/x-icon"
+    }
+  ]
+}
