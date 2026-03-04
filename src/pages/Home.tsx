@@ -6,7 +6,7 @@ import SpendingChart from "@/components/SpendingChart";
 import AddTransactionSheet from "@/components/AddTransactionSheet";
 import GoalCard from "@/components/GoalCard";
 import Logo from "@/components/Logo";
-import { Camera, Plus } from "lucide-react";
+import { Camera, Plus, Landmark } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { format, startOfWeek, endOfWeek, startOfMonth, subDays, isToday, parseISO } from "date-fns";
 
@@ -18,6 +18,7 @@ type Transaction = {
   date: string;
   description: string | null;
   merchant: string | null;
+  source: string | null;
 };
 
 type Profile = {
@@ -66,6 +67,21 @@ const Home = () => {
       setSubsTotal(total);
     }
     setLoading(false);
+  }, []);
+
+  // Auto-sync bank transactions on load
+  useEffect(() => {
+    const autoSync = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data: profile } = await supabase.from("profiles").select("bank_connected").eq("user_id", user.id).single();
+      if ((profile as any)?.bank_connected) {
+        await supabase.functions.invoke("basiq-sync");
+        loadData(); // reload after sync
+      }
+    };
+    if (!loading) return;
+    autoSync();
   }, []);
 
   useEffect(() => { loadData(); }, [loadData]);
@@ -273,10 +289,15 @@ const Home = () => {
                     }`}
                   >
                     <div
-                      className="w-9 h-9 rounded-full flex items-center justify-center text-sm shrink-0"
+                      className="w-9 h-9 rounded-full flex items-center justify-center text-sm shrink-0 relative"
                       style={{ backgroundColor: meta.color + "22" }}
                     >
                       {meta.emoji}
+                      {tx.source === "bank" && (
+                        <span className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-primary/20 flex items-center justify-center">
+                          <Landmark size={9} className="text-primary" />
+                        </span>
+                      )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-[14px] font-medium text-foreground truncate">

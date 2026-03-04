@@ -16,6 +16,9 @@ export type Database = {
     Tables: {
       profiles: {
         Row: {
+          bank_connected: boolean | null
+          bank_name: string | null
+          basiq_user_id: string | null
           created_at: string
           display_name: string | null
           id: string
@@ -28,6 +31,9 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          bank_connected?: boolean | null
+          bank_name?: string | null
+          basiq_user_id?: string | null
           created_at?: string
           display_name?: string | null
           id?: string
@@ -40,6 +46,9 @@ export type Database = {
           user_id: string
         }
         Update: {
+          bank_connected?: boolean | null
+          bank_name?: string | null
+          basiq_user_id?: string | null
           created_at?: string
           display_name?: string | null
           id?: string

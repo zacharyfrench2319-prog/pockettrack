@@ -9,6 +9,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { toast } from "sonner";
 import Logo from "@/components/Logo";
 import UpgradeModal from "@/components/UpgradeModal";
+import ConnectedAccountsSection from "@/components/ConnectedAccountsSection";
 
 const Profile = () => {
   const navigate = useNavigate();
@@ -25,6 +26,8 @@ const Profile = () => {
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
   const [exportLoading, setExportLoading] = useState(false);
+  const [bankConnected, setBankConnected] = useState(false);
+  const [bankName, setBankName] = useState<string | null>(null);
 
   useEffect(() => {
     const dark = document.documentElement.classList.contains("dark");
@@ -33,8 +36,10 @@ const Profile = () => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (user) {
         setEmail(user.email || "");
-        supabase.from("profiles").select("display_name").eq("user_id", user.id).single().then(({ data }) => {
+        supabase.from("profiles").select("display_name, bank_connected, bank_name").eq("user_id", user.id).single().then(({ data }) => {
           if (data?.display_name) setDisplayName(data.display_name);
+          setBankConnected(!!(data as any)?.bank_connected);
+          setBankName((data as any)?.bank_name || null);
         });
       }
     });
@@ -224,6 +229,22 @@ const Profile = () => {
           </button>
         </div>
       </div>
+
+      {/* CONNECTED ACCOUNTS section */}
+      <ConnectedAccountsSection
+        bankConnected={bankConnected}
+        bankName={bankName}
+        onStatusChange={() => {
+          supabase.auth.getUser().then(({ data: { user } }) => {
+            if (user) {
+              supabase.from("profiles").select("bank_connected, bank_name").eq("user_id", user.id).single().then(({ data }) => {
+                setBankConnected(!!(data as any)?.bank_connected);
+                setBankName((data as any)?.bank_name || null);
+              });
+            }
+          });
+        }}
+      />
 
       {/* PREFERENCES section */}
       <div className="space-y-1">
