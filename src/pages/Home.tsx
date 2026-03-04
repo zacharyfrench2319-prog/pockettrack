@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { getCategoryMeta } from "@/lib/categories";
 import SpendingChart from "@/components/SpendingChart";
 import AddTransactionSheet from "@/components/AddTransactionSheet";
+import GoalCard from "@/components/GoalCard";
 import Logo from "@/components/Logo";
 import { Camera, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -24,10 +25,20 @@ type Profile = {
   monthly_income: number | null;
 };
 
+type SavingsGoal = {
+  name: string;
+  target_amount: number;
+  current_amount: number | null;
+  deadline: string | null;
+  icon: string | null;
+  created_at: string | null;
+};
+
 const Home = () => {
   const navigate = useNavigate();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [primaryGoal, setPrimaryGoal] = useState<SavingsGoal | null | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [addOpen, setAddOpen] = useState(false);
 
@@ -35,13 +46,15 @@ const Home = () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    const [profileRes, txRes] = await Promise.all([
+    const [profileRes, txRes, goalsRes] = await Promise.all([
       supabase.from("profiles").select("display_name, monthly_income").eq("user_id", user.id).single(),
       supabase.from("transactions").select("*").eq("user_id", user.id).order("date", { ascending: false }).limit(100),
+      supabase.from("savings_goals").select("*").eq("user_id", user.id).order("created_at", { ascending: true }).limit(1),
     ]);
 
     if (profileRes.data) setProfile(profileRes.data);
     if (txRes.data) setTransactions(txRes.data);
+    setPrimaryGoal(goalsRes.data && goalsRes.data.length > 0 ? goalsRes.data[0] : null);
     setLoading(false);
   }, []);
 
@@ -192,6 +205,14 @@ const Home = () => {
 
           {/* Spending Chart */}
           <SpendingChart dailyData={dailyChartData} weeklyData={weeklyChartData} />
+
+          {/* Savings Goal */}
+          {primaryGoal !== undefined && (
+            <div className="space-y-2">
+              <h2 className="text-lg font-semibold text-foreground">Savings Goal</h2>
+              <GoalCard goal={primaryGoal} />
+            </div>
+          )}
 
           {/* Recent Transactions */}
           <div className="space-y-3">
