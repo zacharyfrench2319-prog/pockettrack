@@ -23,9 +23,13 @@ export type Database = {
           display_name: string | null
           id: string
           monthly_income: number | null
+          next_pay_date: string | null
           onboarding_completed: boolean
           pay_cycle_date: number | null
+          pay_frequency: string | null
+          personal_context: string | null
           saving_goal: string | null
+          spending_concerns: string[] | null
           subscription_status: string | null
           updated_at: string
           user_id: string
@@ -38,9 +42,13 @@ export type Database = {
           display_name?: string | null
           id?: string
           monthly_income?: number | null
+          next_pay_date?: string | null
           onboarding_completed?: boolean
           pay_cycle_date?: number | null
+          pay_frequency?: string | null
+          personal_context?: string | null
           saving_goal?: string | null
+          spending_concerns?: string[] | null
           subscription_status?: string | null
           updated_at?: string
           user_id: string
@@ -53,9 +61,13 @@ export type Database = {
           display_name?: string | null
           id?: string
           monthly_income?: number | null
+          next_pay_date?: string | null
           onboarding_completed?: boolean
           pay_cycle_date?: number | null
+          pay_frequency?: string | null
+          personal_context?: string | null
           saving_goal?: string | null
+          spending_concerns?: string[] | null
           subscription_status?: string | null
           updated_at?: string
           user_id?: string

@@ -1,6 +1,5 @@
 import { Outlet } from "react-router-dom";
 import BottomNav from "./BottomNav";
-import FloatingScanButton from "./FloatingScanButton";
 import AuthGuard from "./AuthGuard";
 
 const AppLayout = () => {
@@ -9,7 +8,6 @@ const AppLayout = () => {
       <div className="min-h-screen pb-16">
         <Outlet />
         <BottomNav />
-        <FloatingScanButton />
       </div>
     </AuthGuard>
   );

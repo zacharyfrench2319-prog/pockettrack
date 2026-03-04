@@ -9,7 +9,7 @@ import TransactionDetailSheet from "@/components/TransactionDetailSheet";
 import AddSubscriptionSheet from "@/components/AddSubscriptionSheet";
 import SubscriptionsList from "@/components/SubscriptionsList";
 import { TransactionListSkeleton } from "@/components/Skeletons";
-import { Plus, Search, ChevronDown, ChevronUp, Lock, Landmark } from "lucide-react";
+import { Plus, Search, ChevronDown, ChevronUp, Landmark } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell } from "recharts";
 import { format, parseISO, startOfMonth } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -262,16 +262,11 @@ const Spending = () => {
       {isSubsTab ? (
         !isPro ? (
           <div className="rounded-2xl bg-card p-8 flex flex-col items-center text-center space-y-4 animate-fade-in" style={{ boxShadow: "var(--card-shadow)" }}>
-            <div className="w-16 h-16 rounded-2xl bg-primary/15 flex items-center justify-center">
-              <Lock size={28} className="text-primary" />
-            </div>
+            <div className="text-5xl">🔄</div>
             <h3 className="text-lg font-semibold text-foreground">Subscription Detector</h3>
             <p className="text-sm text-muted-foreground">
-              Automatically detect recurring charges and track your subscriptions. Upgrade to Pro to unlock this feature.
+              Automatically detect recurring charges and track your subscriptions. Available with Pro.
             </p>
-            <Button className="rounded-xl h-11 px-6 text-[14px] font-semibold">
-              Upgrade to Pro
-            </Button>
           </div>
         ) : subscriptions.length === 0 ? (
           <div className="rounded-2xl bg-card p-8 flex flex-col items-center text-center space-y-4 animate-fade-in" style={{ boxShadow: "var(--card-shadow)" }}>
@@ -415,14 +410,13 @@ const Spending = () => {
                           <Cell
                             key={`cell-${index}`}
                             fill="url(#monthlyPurple)"
-                            opacity={0.4 + (0.6 * entry.amount) / maxMonthly}
                           />
                         ))}
                       </Bar>
                       <defs>
                         <linearGradient id="monthlyPurple" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="0%" stopColor="hsl(263, 86%, 76%)" />
-                          <stop offset="100%" stopColor="hsl(263, 70%, 55%)" />
+                          <stop offset="100%" stopColor="hsl(263, 86%, 56%)" />
                         </linearGradient>
                       </defs>
                     </BarChart>
@@ -434,14 +428,8 @@ const Spending = () => {
         </>
       )}
 
-      {/* Sheets */}
       <AddTransactionSheet open={addOpen} onOpenChange={setAddOpen} onSaved={loadTransactions} />
-      <TransactionDetailSheet
-        transaction={detailTx}
-        open={detailOpen}
-        onOpenChange={setDetailOpen}
-        onUpdated={loadTransactions}
-      />
+      <TransactionDetailSheet transaction={detailTx} open={detailOpen} onOpenChange={setDetailOpen} onUpdated={loadTransactions} />
       <AddSubscriptionSheet open={addSubOpen} onOpenChange={setAddSubOpen} onSaved={loadSubscriptions} />
     </div>
   );
