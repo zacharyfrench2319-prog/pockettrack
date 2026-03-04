@@ -130,7 +130,7 @@ const Profile = () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `pockettrack-transactions-${new Date().toISOString().split("T")[0]}.csv`;
+    a.download = `pockettrack-export-${new Date().toISOString().split("T")[0]}.csv`;
     a.click();
     URL.revokeObjectURL(url);
     setExportLoading(false);

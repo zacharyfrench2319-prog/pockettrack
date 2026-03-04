@@ -2,13 +2,15 @@ import { useEffect, useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { getCategoryMeta } from "@/lib/categories";
+import { formatAUD, formatSmartDate } from "@/lib/formatters";
 import SpendingChart from "@/components/SpendingChart";
 import AddTransactionSheet from "@/components/AddTransactionSheet";
 import GoalCard from "@/components/GoalCard";
 import Logo from "@/components/Logo";
+import { DashboardSkeleton } from "@/components/Skeletons";
 import { Camera, Plus, Landmark } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { format, startOfWeek, endOfWeek, startOfMonth, subDays, isToday, parseISO } from "date-fns";
+import { format, startOfWeek, endOfWeek, startOfMonth, subDays, parseISO } from "date-fns";
 
 type Transaction = {
   id: string;
@@ -74,13 +76,12 @@ const Home = () => {
     const autoSync = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-      const { data: profile } = await supabase.from("profiles").select("bank_connected").eq("user_id", user.id).single();
-      if ((profile as any)?.bank_connected) {
+      const { data: prof } = await supabase.from("profiles").select("bank_connected").eq("user_id", user.id).single();
+      if ((prof as any)?.bank_connected) {
         await supabase.functions.invoke("basiq-sync");
-        loadData(); // reload after sync
+        loadData();
       }
     };
-    if (!loading) return;
     autoSync();
   }, []);
 
@@ -125,7 +126,6 @@ const Home = () => {
     [transactions, monthStart]
   );
 
-  // Daily chart data for current week
   const dailyChartData = useMemo(() => {
     const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
     return days.map((label, i) => {
@@ -139,7 +139,6 @@ const Home = () => {
     });
   }, [transactions, weekStart]);
 
-  // Weekly chart data for last 4 weeks
   const weeklyChartData = useMemo(() => {
     return Array.from({ length: 4 }, (_, i) => {
       const ws = subDays(weekStart, (3 - i) * 7);
@@ -156,15 +155,8 @@ const Home = () => {
   }, [transactions, weekStart]);
 
   const recentTx = transactions.slice(0, 5);
-  const greeting = new Date().getHours() < 12 ? "morning" : new Date().getHours() < 17 ? "afternoon" : "evening";
 
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
+  if (loading) return <DashboardSkeleton />;
 
   const hasData = transactions.length > 0;
 
@@ -176,7 +168,7 @@ const Home = () => {
       </div>
 
       {/* Greeting */}
-      <div className="space-y-1">
+      <div className="space-y-1 animate-fade-in">
         <h1 className="text-[28px] font-bold text-foreground">
           Hey, {profile?.display_name || "there"} 👋
         </h1>
@@ -185,13 +177,13 @@ const Home = () => {
 
       {!hasData ? (
         /* Empty State */
-        <div className="rounded-2xl bg-card p-8 flex flex-col items-center text-center space-y-4" style={{ boxShadow: "var(--card-shadow)" }}>
+        <div className="rounded-2xl bg-card p-8 flex flex-col items-center text-center space-y-4 animate-fade-in" style={{ boxShadow: "var(--card-shadow)" }}>
           <div className="w-16 h-16 rounded-2xl bg-primary/15 flex items-center justify-center">
             <Camera size={28} className="text-primary" />
           </div>
           <div className="space-y-1">
-            <h3 className="text-lg font-semibold text-foreground">No transactions yet</h3>
-            <p className="text-sm text-muted-foreground">Start tracking by scanning a receipt or adding a transaction</p>
+            <h3 className="text-lg font-semibold text-foreground">Start tracking your spending</h3>
+            <p className="text-sm text-muted-foreground">Scan a receipt or add a transaction to get started</p>
           </div>
           <Button onClick={() => navigate("/scan")} className="rounded-xl h-11 px-6 text-[14px] font-semibold">
             Scan a Receipt
@@ -200,16 +192,12 @@ const Home = () => {
       ) : (
         <>
           {/* Balance Card */}
-          <div className="rounded-2xl bg-card p-5 space-y-3" style={{ boxShadow: "var(--card-shadow)" }}>
+          <div className="rounded-2xl bg-card p-5 space-y-3 animate-fade-in" style={{ boxShadow: "var(--card-shadow)" }}>
             <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Total Balance</p>
-            <p className="text-[32px] font-bold text-foreground">
-              ${balance.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </p>
+            <p className="text-[32px] font-bold text-foreground">{formatAUD(balance)}</p>
             <p className="text-sm">
               <span className="text-muted-foreground">This week: </span>
-              <span className="text-destructive font-semibold">
-                -${spendWeek.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </span>
+              <span className="text-destructive font-semibold">-{formatAUD(spendWeek)}</span>
             </p>
           </div>
 
@@ -219,12 +207,14 @@ const Home = () => {
               { label: "Today", value: spendToday },
               { label: "This Week", value: spendWeek },
               { label: "This Month", value: spendMonth },
-            ].map((stat) => (
-              <div key={stat.label} className="rounded-2xl bg-card p-3.5 space-y-1" style={{ boxShadow: "var(--card-shadow)" }}>
+            ].map((stat, i) => (
+              <div
+                key={stat.label}
+                className="rounded-2xl bg-card p-3.5 space-y-1 animate-fade-in"
+                style={{ boxShadow: "var(--card-shadow)", animationDelay: `${i * 80}ms`, animationFillMode: "both" }}
+              >
                 <p className="text-[11px] text-muted-foreground font-medium">{stat.label}</p>
-                <p className="text-[17px] font-bold text-destructive">
-                  ${stat.value.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                </p>
+                <p className="text-[17px] font-bold text-destructive">{formatAUD(stat.value, 0)}</p>
               </div>
             ))}
           </div>
@@ -233,25 +223,25 @@ const Home = () => {
           {subsTotal > 0 && (
             <div
               onClick={() => navigate("/spending")}
-              className="rounded-2xl bg-card p-3.5 flex items-center justify-between cursor-pointer active:scale-[0.98] transition-transform"
+              className="rounded-2xl bg-card p-3.5 flex items-center justify-between cursor-pointer active:scale-[0.98] transition-transform animate-fade-in"
               style={{ boxShadow: "var(--card-shadow)" }}
             >
               <div className="flex items-center gap-2">
                 <span className="text-base">🔄</span>
                 <p className="text-[13px] text-muted-foreground font-medium">Subscriptions</p>
               </div>
-              <p className="text-[15px] font-bold text-foreground">
-                ${subsTotal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/mo
-              </p>
+              <p className="text-[15px] font-bold text-foreground">{formatAUD(subsTotal)}/mo</p>
             </div>
           )}
 
           {/* Spending Chart */}
-          <SpendingChart dailyData={dailyChartData} weeklyData={weeklyChartData} />
+          <div className="animate-fade-in" style={{ animationDelay: "200ms", animationFillMode: "both" }}>
+            <SpendingChart dailyData={dailyChartData} weeklyData={weeklyChartData} />
+          </div>
 
           {/* Savings Goal */}
           {primaryGoal !== undefined && (
-            <div className="space-y-2">
+            <div className="space-y-2 animate-fade-in" style={{ animationDelay: "300ms", animationFillMode: "both" }}>
               <h2 className="text-lg font-semibold text-foreground">Savings Goal</h2>
               <GoalCard goal={primaryGoal} />
             </div>
@@ -284,9 +274,10 @@ const Home = () => {
                 return (
                   <div
                     key={tx.id}
-                    className={`flex items-center gap-3 px-4 py-3 ${
+                    className={`flex items-center gap-3 px-4 py-3 animate-fade-in ${
                       i < recentTx.length - 1 ? "border-b border-border/50" : ""
                     }`}
+                    style={{ animationDelay: `${400 + i * 60}ms`, animationFillMode: "both" }}
                   >
                     <div
                       className="w-9 h-9 rounded-full flex items-center justify-center text-sm shrink-0 relative"
@@ -304,11 +295,11 @@ const Home = () => {
                         {tx.merchant || tx.description || meta.label}
                       </p>
                       <p className="text-[11px] text-muted-foreground">
-                        {meta.label} · {format(parseISO(tx.date), "MMM d")}
+                        {meta.label} · {formatSmartDate(tx.date)}
                       </p>
                     </div>
                     <p className={`text-[15px] font-semibold shrink-0 ${isIncome ? "text-success" : "text-destructive"}`}>
-                      {isIncome ? "+" : "-"}${tx.amount.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                      {isIncome ? "+" : "-"}{formatAUD(tx.amount)}
                     </p>
                   </div>
                 );

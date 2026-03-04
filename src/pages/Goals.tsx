@@ -13,6 +13,7 @@ import { format, differenceInDays, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
 import GoalProgressRing from "@/components/GoalProgressRing";
 import UpgradeModal from "@/components/UpgradeModal";
+import { GoalsSkeleton } from "@/components/Skeletons";
 
 type Goal = {
   id: string;
@@ -177,18 +178,12 @@ const Goals = () => {
     setEditMode(true);
   };
 
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
+  if (loading) return <GoalsSkeleton />;
 
   return (
     <div className="px-5 pt-14 pb-4 space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between animate-fade-in">
         <h1 className="text-[28px] font-bold text-foreground">Goals</h1>
         <Button
           size="sm"
@@ -208,17 +203,17 @@ const Goals = () => {
       </div>
 
       {goals.length === 0 ? (
-        <div className="rounded-2xl bg-card p-8 flex flex-col items-center text-center space-y-4" style={{ boxShadow: "var(--card-shadow)" }}>
+        <div className="rounded-2xl bg-card p-8 flex flex-col items-center text-center space-y-4 animate-fade-in" style={{ boxShadow: "var(--card-shadow)" }}>
           <div className="text-5xl">🎯</div>
-          <h3 className="text-lg font-semibold text-foreground">No goals yet</h3>
-          <p className="text-sm text-muted-foreground">Set a savings goal to start tracking your progress</p>
+          <h3 className="text-lg font-semibold text-foreground">Set your first savings goal</h3>
+          <p className="text-sm text-muted-foreground">Track your progress towards the things that matter most</p>
           <Button onClick={() => { resetForm(); setAddOpen(true); }} className="rounded-xl h-11 px-6 text-[14px] font-semibold">
             Create Your First Goal
           </Button>
         </div>
       ) : (
         <div className="space-y-3">
-          {goals.map((goal) => {
+          {goals.map((goal, i) => {
             const percent = goal.target_amount > 0 ? ((goal.current_amount || 0) / goal.target_amount) * 100 : 0;
             const daysLeft = goal.deadline ? Math.max(differenceInDays(parseISO(goal.deadline), new Date()), 0) : null;
             const status = getGoalStatus(goal);
@@ -226,8 +221,8 @@ const Goals = () => {
             return (
               <div
                 key={goal.id}
-                className="rounded-2xl bg-card p-4 flex items-center gap-4 cursor-pointer active:scale-[0.98] transition-transform"
-                style={{ boxShadow: "var(--card-shadow)" }}
+                className="rounded-2xl bg-card p-4 flex items-center gap-4 cursor-pointer active:scale-[0.98] transition-transform animate-fade-in"
+                style={{ boxShadow: "var(--card-shadow)", animationDelay: `${i * 80}ms`, animationFillMode: "both" }}
                 onClick={() => { setDetailGoal(goal); setEditMode(false); setAddAmount(""); }}
               >
                 <GoalProgressRing percent={percent} size={56} status={status} />
