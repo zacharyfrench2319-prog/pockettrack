@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useSubscription } from "@/contexts/SubscriptionContext";
 import { Plus, Pencil, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +12,7 @@ import { toast } from "sonner";
 import { format, differenceInDays, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
 import GoalProgressRing from "@/components/GoalProgressRing";
+import UpgradeModal from "@/components/UpgradeModal";
 
 type Goal = {
   id: string;
@@ -54,11 +56,13 @@ const getGoalStatus = (goal: Goal): "on_track" | "behind" | "far_behind" => {
 };
 
 const Goals = () => {
+  const { isPro } = useSubscription();
   const [goals, setGoals] = useState<Goal[]>([]);
   const [loading, setLoading] = useState(true);
   const [addOpen, setAddOpen] = useState(false);
   const [detailGoal, setDetailGoal] = useState<Goal | null>(null);
   const [editMode, setEditMode] = useState(false);
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
 
   // Add/edit form
   const [formName, setFormName] = useState("");
@@ -190,7 +194,14 @@ const Goals = () => {
           size="sm"
           variant="ghost"
           className="rounded-xl gap-1 text-primary"
-          onClick={() => { resetForm(); setAddOpen(true); }}
+          onClick={() => {
+            if (!isPro && goals.length >= 1) {
+              setUpgradeOpen(true);
+              return;
+            }
+            resetForm();
+            setAddOpen(true);
+          }}
         >
           <Plus size={18} /> New Goal
         </Button>
@@ -444,6 +455,8 @@ const Goals = () => {
           )}
         </SheetContent>
       </Sheet>
+
+      <UpgradeModal open={upgradeOpen} onOpenChange={setUpgradeOpen} feature="savings goals" />
     </div>
   );
 };

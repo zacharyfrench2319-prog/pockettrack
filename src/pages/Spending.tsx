@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useSubscription } from "@/contexts/SubscriptionContext";
 import { getCategoryMeta } from "@/lib/categories";
 import CATEGORY_META from "@/lib/categories";
 import AddTransactionSheet from "@/components/AddTransactionSheet";
@@ -36,6 +37,7 @@ export type Subscription = {
 type FilterKey = "all" | "income" | "expense" | "subscriptions";
 
 const Spending = () => {
+  const { isPro } = useSubscription();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,19 +48,13 @@ const Spending = () => {
   const [detailTx, setDetailTx] = useState<Transaction | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [breakdownOpen, setBreakdownOpen] = useState(false);
-  const [isPro, setIsPro] = useState(false);
 
   const loadTransactions = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    const [txRes, profileRes] = await Promise.all([
-      supabase.from("transactions").select("*").eq("user_id", user.id).order("date", { ascending: false }),
-      supabase.from("profiles").select("subscription_status").eq("user_id", user.id).single(),
-    ]);
-
-    if (txRes.data) setTransactions(txRes.data);
-    if (profileRes.data) setIsPro(profileRes.data.subscription_status === "pro");
+    const { data: txData } = await supabase.from("transactions").select("*").eq("user_id", user.id).order("date", { ascending: false });
+    if (txData) setTransactions(txData);
     setLoading(false);
   }, []);
 
