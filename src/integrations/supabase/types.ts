@@ -21,7 +21,9 @@ export type Database = {
           id: string
           monthly_income: number | null
           onboarding_completed: boolean
+          pay_cycle_date: number | null
           saving_goal: string | null
+          subscription_status: string | null
           updated_at: string
           user_id: string
         }
@@ -31,7 +33,9 @@ export type Database = {
           id?: string
           monthly_income?: number | null
           onboarding_completed?: boolean
+          pay_cycle_date?: number | null
           saving_goal?: string | null
+          subscription_status?: string | null
           updated_at?: string
           user_id: string
         }
@@ -41,8 +45,157 @@ export type Database = {
           id?: string
           monthly_income?: number | null
           onboarding_completed?: boolean
+          pay_cycle_date?: number | null
           saving_goal?: string | null
+          subscription_status?: string | null
           updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      savings_goals: {
+        Row: {
+          created_at: string | null
+          current_amount: number | null
+          deadline: string | null
+          icon: string | null
+          id: string
+          name: string
+          target_amount: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          current_amount?: number | null
+          deadline?: string | null
+          icon?: string | null
+          id?: string
+          name: string
+          target_amount: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          current_amount?: number | null
+          deadline?: string | null
+          icon?: string | null
+          id?: string
+          name?: string
+          target_amount?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
+      scans: {
+        Row: {
+          created_at: string | null
+          extracted_data: Json | null
+          id: string
+          image_url: string | null
+          scan_type: string | null
+          user_id: string
+          verdict: string | null
+          verdict_reason: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          extracted_data?: Json | null
+          id?: string
+          image_url?: string | null
+          scan_type?: string | null
+          user_id: string
+          verdict?: string | null
+          verdict_reason?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          extracted_data?: Json | null
+          id?: string
+          image_url?: string | null
+          scan_type?: string | null
+          user_id?: string
+          verdict?: string | null
+          verdict_reason?: string | null
+        }
+        Relationships: []
+      }
+      subscriptions: {
+        Row: {
+          amount: number
+          category: string | null
+          created_at: string | null
+          frequency: string | null
+          id: string
+          is_active: boolean | null
+          last_charged: string | null
+          name: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          category?: string | null
+          created_at?: string | null
+          frequency?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_charged?: string | null
+          name: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          category?: string | null
+          created_at?: string | null
+          frequency?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_charged?: string | null
+          name?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      transactions: {
+        Row: {
+          amount: number
+          category: string | null
+          created_at: string | null
+          date: string
+          description: string | null
+          id: string
+          is_subscription: boolean | null
+          merchant: string | null
+          receipt_url: string | null
+          source: string | null
+          type: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          category?: string | null
+          created_at?: string | null
+          date: string
+          description?: string | null
+          id?: string
+          is_subscription?: boolean | null
+          merchant?: string | null
+          receipt_url?: string | null
+          source?: string | null
+          type: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          category?: string | null
+          created_at?: string | null
+          date?: string
+          description?: string | null
+          id?: string
+          is_subscription?: boolean | null
+          merchant?: string | null
+          receipt_url?: string | null
+          source?: string | null
+          type?: string
           user_id?: string
         }
         Relationships: []
