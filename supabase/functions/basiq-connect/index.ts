@@ -114,10 +114,9 @@ Deno.serve(async (req) => {
         method: "POST",
         headers: {
           Authorization: `Bearer ${basiqToken}`,
-          "Content-Type": "application/json",
+          Accept: "application/json",
           "basiq-version": "3.0",
         },
-        body: JSON.stringify({ mobile: false }),
       }
     );
     const consentData = await consentRes.json();
