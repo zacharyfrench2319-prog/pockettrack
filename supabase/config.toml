@@ -17,3 +17,9 @@ verify_jwt = false
 
 [functions.stripe-webhook]
 verify_jwt = false
+
+[functions.basiq-connect]
+verify_jwt = false
+
+[functions.basiq-sync]
+verify_jwt = false

@@ -7,7 +7,7 @@ import AddTransactionSheet from "@/components/AddTransactionSheet";
 import TransactionDetailSheet from "@/components/TransactionDetailSheet";
 import AddSubscriptionSheet from "@/components/AddSubscriptionSheet";
 import SubscriptionsList from "@/components/SubscriptionsList";
-import { Plus, Search, ChevronDown, ChevronUp, Lock } from "lucide-react";
+import { Plus, Search, ChevronDown, ChevronUp, Lock, Landmark } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell } from "recharts";
 import { format, parseISO, startOfMonth } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -310,10 +310,15 @@ const Spending = () => {
                     }`}
                   >
                     <div
-                      className="w-9 h-9 rounded-full flex items-center justify-center text-sm shrink-0"
+                      className="w-9 h-9 rounded-full flex items-center justify-center text-sm shrink-0 relative"
                       style={{ backgroundColor: meta.color + "22" }}
                     >
                       {meta.emoji}
+                      {tx.source === "bank" && (
+                        <span className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-primary/20 flex items-center justify-center">
+                          <Landmark size={9} className="text-primary" />
+                        </span>
+                      )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-[14px] font-medium text-foreground truncate">
