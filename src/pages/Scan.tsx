@@ -1,13 +1,15 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { useSubscription } from "@/contexts/SubscriptionContext";
 import CATEGORY_META from "@/lib/categories";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, Camera, Upload, Loader2, Check, X, Receipt, ShoppingBag, Lightbulb, ThumbsUp, ThumbsDown } from "lucide-react";
-import { format } from "date-fns";
+import { format, startOfMonth } from "date-fns";
 import { toast } from "sonner";
+import UpgradeModal from "@/components/UpgradeModal";
 
 // ── Types ──────────────────────────────────────────────────
 type ScanItem = { name: string; price: number };
@@ -47,6 +49,7 @@ const VERDICT_STYLES: Record<string, { bg: string; text: string; label: string }
 // ── Component ──────────────────────────────────────────────
 const Scan = () => {
   const navigate = useNavigate();
+  const { isPro } = useSubscription();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
@@ -56,6 +59,8 @@ const Scan = () => {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [scanning, setScanning] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const [scanCount, setScanCount] = useState(0);
 
   // Receipt state
   const [receiptResult, setReceiptResult] = useState<ReceiptResult | null>(null);
@@ -68,6 +73,33 @@ const Scan = () => {
   // Product state
   const [productResult, setProductResult] = useState<ProductResult | null>(null);
   const [dismissed, setDismissed] = useState(false);
+
+  // Check scan count for free users
+  useEffect(() => {
+    const checkScanCount = async () => {
+      if (isPro) return;
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const monthStart = format(startOfMonth(new Date()), "yyyy-MM-dd");
+      const { count } = await supabase
+        .from("scans")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .gte("created_at", monthStart);
+      setScanCount(count || 0);
+    };
+    checkScanCount();
+  }, [isPro]);
+
+  const canScan = isPro || scanCount < 5;
+
+  const handleModeSelect = (m: ScanMode) => {
+    if (!canScan) {
+      setUpgradeOpen(true);
+      return;
+    }
+    setMode(m);
+  };
 
   // ── Shared helpers ─────────────────────────────────────
   const handleFileSelect = (file: File) => {
@@ -226,15 +258,23 @@ const Scan = () => {
           <p className="text-[15px] text-muted-foreground">What would you like to do?</p>
         </div>
         <div className="space-y-4">
-          <button onClick={() => setMode("receipt")} className="w-full rounded-2xl bg-card p-6 flex items-center gap-4 text-left active:scale-[0.98] transition-transform" style={{ boxShadow: "var(--card-shadow)" }}>
+          <button onClick={() => handleModeSelect("receipt")} className="w-full rounded-2xl bg-card p-6 flex items-center gap-4 text-left active:scale-[0.98] transition-transform" style={{ boxShadow: "var(--card-shadow)" }}>
             <div className="w-14 h-14 rounded-2xl bg-primary/15 flex items-center justify-center shrink-0"><Receipt size={28} className="text-primary" /></div>
             <div><p className="text-[16px] font-semibold text-foreground">Scan Receipt</p><p className="text-[13px] text-muted-foreground mt-0.5">Log an expense from a receipt</p></div>
           </button>
-          <button onClick={() => setMode("should_i_buy")} className="w-full rounded-2xl bg-card p-6 flex items-center gap-4 text-left active:scale-[0.98] transition-transform" style={{ boxShadow: "var(--card-shadow)" }}>
+          <button onClick={() => handleModeSelect("should_i_buy")} className="w-full rounded-2xl bg-card p-6 flex items-center gap-4 text-left active:scale-[0.98] transition-transform" style={{ boxShadow: "var(--card-shadow)" }}>
             <div className="w-14 h-14 rounded-2xl bg-success/15 flex items-center justify-center shrink-0"><ShoppingBag size={28} className="text-success" /></div>
             <div><p className="text-[16px] font-semibold text-foreground">Should I Buy This?</p><p className="text-[13px] text-muted-foreground mt-0.5">Get AI advice on a purchase</p></div>
           </button>
         </div>
+
+        {!isPro && (
+          <p className="text-center text-xs text-muted-foreground mt-4">
+            {scanCount}/5 free scans used this month
+          </p>
+        )}
+
+        <UpgradeModal open={upgradeOpen} onOpenChange={setUpgradeOpen} feature="AI scans" />
       </div>
     );
   }
