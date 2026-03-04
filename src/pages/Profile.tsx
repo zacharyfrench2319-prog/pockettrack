@@ -110,11 +110,12 @@ const Profile = () => {
     if (redeemCode.trim() === "POCKETTRACK2026") {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-      await supabase.from("profiles").update({ subscription_status: "pro" }).eq("user_id", user.id);
-      toast.success("Pro unlocked! 🎉");
+      const { error } = await supabase.from("profiles").update({ subscription_status: "pro" }).eq("user_id", user.id);
+      if (error) { toast.error("Failed to redeem code"); return; }
       setRedeemOpen(false);
       setRedeemCode("");
-      refreshSubscription();
+      await refreshSubscription();
+      toast.success("Pro unlocked! 🎉");
     } else {
       toast.error("Invalid code");
     }

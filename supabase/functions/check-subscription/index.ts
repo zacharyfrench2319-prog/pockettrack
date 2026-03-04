@@ -32,10 +32,23 @@ serve(async (req) => {
       apiVersion: "2025-08-27.basil",
     });
 
+    // Check current profile status first — don't downgrade redeemed users
+    const { data: profile } = await supabaseClient
+      .from("profiles")
+      .select("subscription_status")
+      .eq("user_id", user.id)
+      .single();
+
     const customers = await stripe.customers.list({ email: user.email, limit: 1 });
 
     if (customers.data.length === 0) {
-      // Update profile to free
+      // If already pro (e.g. redeemed code), don't overwrite
+      if (profile?.subscription_status === "pro") {
+        return new Response(JSON.stringify({ subscribed: true }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200,
+        });
+      }
       await supabaseClient.from("profiles").update({ subscription_status: "free" }).eq("user_id", user.id);
       return new Response(JSON.stringify({ subscribed: false }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -61,10 +74,12 @@ serve(async (req) => {
       hasActive = trialing.data.length > 0;
     }
 
-    // Update profiles table
-    await supabaseClient.from("profiles")
-      .update({ subscription_status: hasActive ? "pro" : "free" })
-      .eq("user_id", user.id);
+    // Update profiles table — don't downgrade redeemed users
+    if (hasActive || profile?.subscription_status !== "pro") {
+      await supabaseClient.from("profiles")
+        .update({ subscription_status: hasActive ? "pro" : "free" })
+        .eq("user_id", user.id);
+    }
 
     return new Response(JSON.stringify({
       subscribed: hasActive,
