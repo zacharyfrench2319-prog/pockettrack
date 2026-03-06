@@ -124,7 +124,7 @@ const SetBudgetSheet = ({ open, onOpenChange, onSaved }: SetBudgetSheetProps) =>
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="rounded-t-3xl bg-card border-0 h-[90vh] overflow-y-auto px-6 sm:px-8 pb-8">
+      <SheetContent side="bottom" className="rounded-t-3xl bg-card border-0 max-h-[90dvh] overflow-y-auto px-6 sm:px-8 pb-8">
         <SheetHeader className="pt-2 pb-4">
           <SheetTitle className="text-xl font-bold">Set Budgets</SheetTitle>
           <SheetDescription className="sr-only">Set spending limits per category</SheetDescription>

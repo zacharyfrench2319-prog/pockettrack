@@ -98,7 +98,7 @@ const AiCoachSheet = ({ open, onOpenChange }: AiCoachSheetProps) => {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="rounded-t-3xl bg-card border-0 h-[90vh] flex flex-col px-6 sm:px-8 pb-5">
+      <SheetContent side="bottom" className="rounded-t-3xl bg-card border-0 max-h-[90dvh] flex flex-col px-6 sm:px-8 pb-5">
         <SheetHeader className="pt-2 pb-3 shrink-0">
           <div className="flex items-center justify-between">
             <SheetTitle className="text-xl font-bold flex items-center gap-2">

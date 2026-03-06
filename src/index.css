@@ -148,6 +148,11 @@
                 0 -1px 16px 0 rgba(0, 0, 0, 0.06);
   }
 
+  /* Scroll focused inputs into view when keyboard opens */
+  input:focus, textarea:focus, select:focus {
+    scroll-margin-bottom: 40vh;
+  }
+
   .pb-safe {
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }

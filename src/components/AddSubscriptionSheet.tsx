@@ -76,7 +76,7 @@ const AddSubscriptionSheet = ({ open, onOpenChange, onSaved }: AddSubscriptionSh
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="rounded-t-3xl bg-card border-0 h-[90vh] overflow-y-auto px-6 sm:px-8 pb-8">
+      <SheetContent side="bottom" className="rounded-t-3xl bg-card border-0 max-h-[90dvh] overflow-y-auto px-6 sm:px-8 pb-8">
         <SheetHeader>
           <SheetTitle>Add Subscription</SheetTitle>
           <SheetDescription>Track a recurring charge — expenses are logged automatically</SheetDescription>

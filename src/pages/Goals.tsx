@@ -263,7 +263,7 @@ const Goals = () => {
 
       {/* ADD GOAL SHEET */}
       <Sheet open={addOpen} onOpenChange={setAddOpen}>
-        <SheetContent side="bottom" className="rounded-t-3xl bg-card border-0 h-[90vh] overflow-y-auto px-6 sm:px-8 pb-8">
+        <SheetContent side="bottom" className="rounded-t-3xl bg-card border-0 max-h-[90dvh] overflow-y-auto px-6 sm:px-8 pb-8">
           <SheetHeader>
             <SheetTitle>Create Goal</SheetTitle>
             <SheetDescription>Set a new savings target</SheetDescription>
@@ -324,7 +324,7 @@ const Goals = () => {
 
       {/* GOAL DETAIL SHEET */}
       <Sheet open={!!detailGoal} onOpenChange={(open) => { if (!open) { setDetailGoal(null); setEditMode(false); } }}>
-        <SheetContent side="bottom" className="rounded-t-3xl bg-card border-0 h-[90vh] overflow-y-auto px-6 sm:px-8 pb-8">
+        <SheetContent side="bottom" className="rounded-t-3xl bg-card border-0 max-h-[90dvh] overflow-y-auto px-6 sm:px-8 pb-8">
           {detailGoal && !editMode && (() => {
             const percent = detailGoal.target_amount > 0 ? ((detailGoal.current_amount || 0) / detailGoal.target_amount) * 100 : 0;
             const daysLeft = detailGoal.deadline ? Math.max(differenceInDays(parseISO(detailGoal.deadline), new Date()), 0) : null;
