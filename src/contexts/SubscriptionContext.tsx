@@ -31,18 +31,21 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
         .eq("user_id", user.id)
         .single();
 
-      if (profile?.subscription_status === "pro") {
-        setIsPro(true);
-        setLoading(false);
-      } else {
-        setIsPro(false);
-        setLoading(false);
-      }
+      const profileIsPro = profile?.subscription_status === "pro";
+      setIsPro(profileIsPro);
+      setLoading(false);
 
-      // Then verify with Stripe in background
-      const { data } = await supabase.functions.invoke("check-subscription");
-      if (data && !data.error) {
-        setIsPro(data.subscribed === true);
+      // If not pro via profile, check Stripe as fallback
+      if (!profileIsPro) {
+        const { data } = await supabase.functions.invoke("check-subscription");
+        if (data && !data.error && data.subscribed === true) {
+          setIsPro(true);
+          // Sync Stripe status to profile
+          const { data: { user: currentUser } } = await supabase.auth.getUser();
+          if (currentUser) {
+            await supabase.from("profiles").update({ subscription_status: "pro" }).eq("user_id", currentUser.id);
+          }
+        }
       }
     } catch {
       setLoading(false);
