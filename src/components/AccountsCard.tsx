@@ -224,9 +224,11 @@ const AccountsCard = ({ transactionBalance = 0, weeklySpend = 0 }: AccountsCardP
                       border: "1px solid hsl(var(--border))",
                       borderRadius: "8px",
                       fontSize: "12px",
+                      color: "hsl(var(--foreground))",
                     }}
                     formatter={(value: number) => [formatAUD(value), "Balance"]}
                     labelStyle={{ color: "hsl(var(--muted-foreground))", fontSize: "11px" }}
+                    itemStyle={{ color: "hsl(var(--foreground))" }}
                   />
                   <Line
                     type="monotone"
