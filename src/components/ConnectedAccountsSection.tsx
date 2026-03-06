@@ -31,6 +31,7 @@ import CATEGORY_META from "@/lib/categories";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import UpgradeModal from "@/components/UpgradeModal";
+import { compressImageToBase64 } from "@/lib/imageCompression";
 
 interface Props {
   bankConnected: boolean;
@@ -271,14 +272,20 @@ const ConnectedAccountsSection = ({
     setCsvLoading(false);
   };
 
-  const handleScreenshotFileSelect = (file: File) => {
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const dataUrl = ev.target?.result as string;
-      setScreenshotImagePreview(dataUrl);
-      setScreenshotImageBase64(dataUrl.split(",")[1]);
-    };
-    reader.readAsDataURL(file);
+  const handleScreenshotFileSelect = async (file: File) => {
+    try {
+      const b64 = await compressImageToBase64(file);
+      setScreenshotImagePreview(`data:image/jpeg;base64,${b64}`);
+      setScreenshotImageBase64(b64);
+    } catch {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const dataUrl = ev.target?.result as string;
+        setScreenshotImagePreview(dataUrl);
+        setScreenshotImageBase64(dataUrl.split(",")[1]);
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleScreenshotInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {

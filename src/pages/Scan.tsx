@@ -13,6 +13,7 @@ import { ArrowLeft, Camera, Upload, Loader2, Check, X, Receipt, ShoppingBag, Lig
 import { format, startOfMonth } from "date-fns";
 import { toast } from "sonner";
 import UpgradeModal from "@/components/UpgradeModal";
+import { compressImageToBase64, compressImageToBlob } from "@/lib/imageCompression";
 
 // ── Types ──────────────────────────────────────────────────
 type ScanItem = { name: string; price: number };
@@ -142,15 +143,22 @@ const Scan = () => {
   };
 
   // ── Shared helpers ─────────────────────────────────────
-  const handleFileSelect = (file: File) => {
+  const handleFileSelect = async (file: File) => {
     setImageFile(file);
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const dataUrl = e.target?.result as string;
-      setImagePreview(dataUrl);
-      setImageBase64(dataUrl.split(",")[1]);
-    };
-    reader.readAsDataURL(file);
+    try {
+      const b64 = await compressImageToBase64(file);
+      setImagePreview(`data:image/jpeg;base64,${b64}`);
+      setImageBase64(b64);
+    } catch {
+      // Fallback to uncompressed if compression fails
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const dataUrl = e.target?.result as string;
+        setImagePreview(dataUrl);
+        setImageBase64(dataUrl.split(",")[1]);
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -161,15 +169,23 @@ const Scan = () => {
   const takeNativePhoto = useCallback(async (source: CameraSource) => {
     try {
       const photo = await CapCamera.getPhoto({
-        quality: 90,
+        quality: 80,
         resultType: CameraResultType.Base64,
         source,
         allowEditing: false,
+        width: 1280,
+        height: 1280,
       });
       if (photo.base64String) {
-        const mimeType = photo.format === "png" ? "image/png" : "image/jpeg";
-        setImagePreview(`data:${mimeType};base64,${photo.base64String}`);
-        setImageBase64(photo.base64String);
+        try {
+          const b64 = await compressImageToBase64(photo.base64String);
+          setImagePreview(`data:image/jpeg;base64,${b64}`);
+          setImageBase64(b64);
+        } catch {
+          // Fallback to original
+          setImagePreview(`data:image/jpeg;base64,${photo.base64String}`);
+          setImageBase64(photo.base64String);
+        }
       }
     } catch {
       // User cancelled
@@ -261,9 +277,9 @@ const Scan = () => {
 
     let receiptUrl: string | null = null;
     if (imageFile) {
-      const ext = imageFile.name.split(".").pop() || "jpg";
-      const path = `${user.id}/${Date.now()}.${ext}`;
-      const { error: uploadError } = await supabase.storage.from("receipts").upload(path, imageFile, { contentType: imageFile.type });
+      const path = `${user.id}/${Date.now()}.jpg`;
+      const compressed = await compressImageToBlob(imageFile).catch(() => imageFile);
+      const { error: uploadError } = await supabase.storage.from("receipts").upload(path, compressed, { contentType: "image/jpeg" });
       if (!uploadError) {
         const { data: urlData } = supabase.storage.from("receipts").getPublicUrl(path);
         receiptUrl = urlData.publicUrl;
@@ -321,7 +337,7 @@ const Scan = () => {
 
   // ── Product scan — Step 2: Get advice with reasoning ──
   const handleGetAdvice = async () => {
-    if (!imageBase64 || !identifiedProduct) return;
+    if (!identifiedProduct) return;
     setScanning(true);
     setShowReasoningStep(false);
 
@@ -329,9 +345,11 @@ const Scan = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
+      // Send only text (product name + price + reasoning) — no image re-upload
       const { data, error } = await supabase.functions.invoke("scan-product", {
         body: {
-          image_base64: imageBase64,
+          product_name: identifiedProduct.name,
+          price: identifiedProduct.price,
           user_id: user.id,
           user_reasoning: userReasoning.trim() || undefined,
         },
@@ -424,11 +442,11 @@ const Scan = () => {
 
     let imageUrl: string | null = null;
     if (imageFile) {
-      const ext = imageFile.name.split(".").pop() || "jpg";
-      const path = `${user.id}/${Date.now()}.${ext}`;
+      const path = `${user.id}/${Date.now()}.jpg`;
+      const compressed = await compressImageToBlob(imageFile).catch(() => imageFile);
       const { error: uploadError } = await supabase.storage
         .from("receipts")
-        .upload(path, imageFile, { contentType: imageFile.type });
+        .upload(path, compressed, { contentType: "image/jpeg" });
       if (!uploadError) {
         const { data: urlData } = supabase.storage.from("receipts").getPublicUrl(path);
         imageUrl = urlData.publicUrl;

@@ -117,7 +117,7 @@ const AccountsCard = ({ transactionBalance = 0, weeklySpend = 0 }: AccountsCardP
       const { data, error } = await supabase.functions.invoke("ai-coach", {
         body: {
           question: "Give me a brief 2-3 sentence personalized tip on how to grow my balance based on my spending habits, accounts, and goals. Be specific with numbers from my data. Focus on the single most impactful thing I can do right now.",
-          user_id: user.id,
+          brief: true,
         },
       });
       if (error) throw error;

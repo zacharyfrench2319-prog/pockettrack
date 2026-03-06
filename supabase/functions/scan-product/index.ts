@@ -53,10 +53,16 @@ serve(async (req) => {
     const weekStartStr = weekStart.toISOString().split("T")[0];
     const monthStartStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
 
+    // Only fetch last 6 months of transactions for context
+    const sixMonthsAgo = new Date(now);
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+    const sixMonthsAgoStr = sixMonthsAgo.toISOString().split("T")[0];
+
     const { data: transactions } = await supabase
       .from("transactions")
       .select("amount, type, date, category")
-      .eq("user_id", user_id);
+      .eq("user_id", user_id)
+      .gte("date", sixMonthsAgoStr);
 
     const allTx = transactions || [];
 

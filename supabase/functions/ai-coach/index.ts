@@ -28,7 +28,7 @@ serve(async (req) => {
     }
     const user_id = authUser.id;
 
-    const { question, history } = await req.json();
+    const { question, history, brief } = await req.json();
     if (!question) {
       return new Response(
         JSON.stringify({ error: "Missing question" }),
@@ -42,16 +42,16 @@ serve(async (req) => {
     const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
     if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY is not configured");
 
-    // Gather all user context in parallel
+    // Gather user context in parallel — use lighter queries for brief/tip mode
     const [profileRes, txRes, goalsRes, subsRes, budgetsRes, accountsRes, scheduledRes, nwRes] = await Promise.all([
       supabase.from("profiles").select("*").eq("user_id", user_id).single(),
-      supabase.from("transactions").select("amount, type, date, category, merchant, description").eq("user_id", user_id).order("date", { ascending: false }).limit(200),
+      supabase.from("transactions").select("amount, type, date, category, merchant, description").eq("user_id", user_id).order("date", { ascending: false }).limit(brief ? 50 : 200),
       supabase.from("savings_goals").select("*").eq("user_id", user_id),
-      supabase.from("subscriptions").select("name, amount, frequency, is_active").eq("user_id", user_id).eq("is_active", true),
-      supabase.from("budgets").select("category, amount").eq("user_id", user_id),
+      brief ? Promise.resolve({ data: [] }) : supabase.from("subscriptions").select("name, amount, frequency, is_active").eq("user_id", user_id).eq("is_active", true),
+      brief ? Promise.resolve({ data: [] }) : supabase.from("budgets").select("category, amount").eq("user_id", user_id),
       supabase.from("accounts").select("name, type, balance").eq("user_id", user_id),
-      supabase.from("scheduled_transactions").select("amount, type, frequency, merchant, next_date, is_active").eq("user_id", user_id).eq("is_active", true),
-      supabase.from("net_worth_snapshots").select("total, date").eq("user_id", user_id).order("date", { ascending: false }).limit(1),
+      brief ? Promise.resolve({ data: [] }) : supabase.from("scheduled_transactions").select("amount, type, frequency, merchant, next_date, is_active").eq("user_id", user_id).eq("is_active", true),
+      brief ? Promise.resolve({ data: [] }) : supabase.from("net_worth_snapshots").select("total, date").eq("user_id", user_id).order("date", { ascending: false }).limit(1),
     ]);
 
     const profile = profileRes.data;
