@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable";
 import Logo from "@/components/Logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,10 +14,11 @@ const Auth = () => {
   const [loading, setLoading] = useState(false);
 
   const handleGoogleLogin = async () => {
-    const result = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: window.location.origin + "/home",
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: window.location.origin + "/home" },
     });
-    if (result?.error) toast.error(String(result.error));
+    if (error) toast.error(error.message);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -26,13 +26,15 @@ const Auth = () => {
     setLoading(true);
 
     if (isSignUp) {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: { emailRedirectTo: window.location.origin + "/onboarding" },
       });
       if (error) {
         toast.error(error.message);
+      } else if (data.session) {
+        navigate("/onboarding");
       } else {
         toast.success("Check your email to confirm your account!");
       }
