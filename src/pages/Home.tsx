@@ -19,7 +19,7 @@ import { useAutoChargeSubscriptions } from "@/hooks/useAutoChargeSubscriptions";
 import { useTransactions, useSubscriptions, useProfile, useGoals, useBudgets, useScheduledTransactions, useInvalidateQueries } from "@/hooks/useSupabaseQueries";
 import { Camera, Plus, Landmark, Sparkles, AlertTriangle, CalendarClock, Receipt, ShoppingBag, Wallet, BarChart3, Brain, Target, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { format, startOfWeek, endOfWeek, startOfMonth, subDays, parseISO } from "date-fns";
+import { format, startOfWeek, endOfWeek, startOfMonth, subMonths, subDays, parseISO } from "date-fns";
 
 const Home = () => {
   const navigate = useNavigate();
@@ -147,6 +147,19 @@ const Home = () => {
       return { label: `W${i + 1}`, amount };
     });
   }, [transactions, weekStart]);
+
+  const monthlyChartData = useMemo(() => {
+    const ms = startOfMonth(now);
+    return Array.from({ length: 6 }, (_, i) => {
+      const mStart = subMonths(ms, 5 - i);
+      const key = format(mStart, "yyyy-MM");
+      const label = format(mStart, "MMM");
+      const amount = transactions
+        .filter((t) => t.type === "expense" && format(parseISO(t.date), "yyyy-MM") === key)
+        .reduce((s, t) => s + t.amount, 0);
+      return { label, amount };
+    });
+  }, [transactions]);
 
   const recentTx = transactions.slice(0, 5);
 
@@ -309,7 +322,7 @@ const Home = () => {
 
           {/* Spending Chart */}
           <div className="animate-fade-in" style={{ animationDelay: "200ms", animationFillMode: "both" }}>
-            <SpendingChart dailyData={dailyChartData} weeklyData={weeklyChartData} />
+            <SpendingChart dailyData={dailyChartData} weeklyData={weeklyChartData} monthlyData={monthlyChartData} />
           </div>
 
           {/* Monthly Insights */}

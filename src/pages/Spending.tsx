@@ -390,6 +390,9 @@ const Spending = () => {
         </>
       )}
 
+      {/* Spacer for bottom nav */}
+      <div className="h-14" />
+
       <AddTransactionSheet open={addOpen} onOpenChange={setAddOpen} onSaved={() => invalidate("transactions", "subscriptions")} />
       <TransactionDetailSheet transaction={detailTx} open={detailOpen} onOpenChange={setDetailOpen} onUpdated={() => invalidate("transactions")} />
       <AddSubscriptionSheet open={addSubOpen} onOpenChange={setAddSubOpen} onSaved={() => invalidate("subscriptions")} />
