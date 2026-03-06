@@ -9,22 +9,38 @@ const AuthGuard = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setUser(session?.user ?? null);
-        if (!session?.user) {
-          navigate("/auth");
-        }
+    const checkAuth = async (authUser: User | null) => {
+      if (!authUser) {
+        navigate("/auth");
         setLoading(false);
+        return;
+      }
+
+      // Check if onboarding is completed
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("onboarding_completed")
+        .eq("user_id", authUser.id)
+        .maybeSingle();
+
+      if (!profile || !profile.onboarding_completed) {
+        navigate("/onboarding");
+        setLoading(false);
+        return;
+      }
+
+      setUser(authUser);
+      setLoading(false);
+    };
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        checkAuth(session?.user ?? null);
       }
     );
 
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      if (!session?.user) {
-        navigate("/auth");
-      }
-      setLoading(false);
+      checkAuth(session?.user ?? null);
     });
 
     return () => subscription.unsubscribe();

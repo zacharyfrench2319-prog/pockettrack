@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import Logo from "@/components/Logo";
@@ -36,7 +36,7 @@ type OnboardingAccount = {
 
 const Onboarding = () => {
   const navigate = useNavigate();
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(0); // 0 = loading
   const [displayName, setDisplayName] = useState("");
   const [monthlyIncome, setMonthlyIncome] = useState("");
   const [payFrequency, setPayFrequency] = useState("");
@@ -48,6 +48,77 @@ const Onboarding = () => {
     { name: "", type: "checking", balance: "" },
   ]);
   const [loading, setLoading] = useState(false);
+
+  // Load existing progress on mount
+  useEffect(() => {
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        navigate("/auth");
+        return;
+      }
+
+      // Check if already completed
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (profile?.onboarding_completed) {
+        navigate("/home");
+        return;
+      }
+
+      // Restore saved progress
+      if (profile) {
+        if ((profile as any).display_name) setDisplayName((profile as any).display_name);
+        if ((profile as any).monthly_income) setMonthlyIncome(String((profile as any).monthly_income));
+        if ((profile as any).pay_frequency) setPayFrequency((profile as any).pay_frequency);
+        if ((profile as any).next_pay_date) setNextPayDate((profile as any).next_pay_date);
+        if ((profile as any).spending_concerns) {
+          const concerns = (profile as any).spending_concerns as string[];
+          const known = concerns.filter((c: string) => CONCERN_OPTIONS.includes(c));
+          const other = concerns.find((c: string) => !CONCERN_OPTIONS.includes(c));
+          setSelectedConcerns(known);
+          if (other) setOtherConcern(other);
+        }
+        if ((profile as any).personal_context) setPersonalContext((profile as any).personal_context);
+      }
+
+      // Load saved accounts
+      const { data: savedAccounts } = await supabase
+        .from("accounts")
+        .select("name, type, balance")
+        .eq("user_id", user.id);
+
+      if (savedAccounts && savedAccounts.length > 0) {
+        setAccounts(savedAccounts.map((a) => ({
+          name: a.name,
+          type: a.type,
+          balance: String(a.balance),
+        })));
+      }
+
+      // Determine resume step
+      if (profile) {
+        const concerns = (profile as any).spending_concerns;
+        if (concerns && concerns.length > 0) {
+          setStep(5); // Concerns done, show personal context
+        } else if (savedAccounts && savedAccounts.length > 0) {
+          setStep(4); // Accounts done, show concerns
+        } else if ((profile as any).monthly_income || (profile as any).pay_frequency) {
+          setStep(3); // Income done, show accounts
+        } else if ((profile as any).display_name) {
+          setStep(2); // Name done, show income
+        } else {
+          setStep(1);
+        }
+      } else {
+        setStep(1);
+      }
+    })();
+  }, [navigate]);
 
   const toggleConcern = (c: string) => {
     setSelectedConcerns((prev) =>
@@ -67,6 +138,40 @@ const Onboarding = () => {
     const updated = [...accounts];
     updated[index] = { ...updated[index], [field]: value };
     setAccounts(updated);
+  };
+
+  // Save partial profile data (called on each step transition)
+  const saveProgress = async (data: Record<string, any>) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    await supabase
+      .from("profiles")
+      .upsert({ user_id: user.id, ...data } as any, { onConflict: "user_id" });
+  };
+
+  const goToStep = async (nextStep: number, saveData?: Record<string, any>) => {
+    if (saveData) await saveProgress(saveData);
+    setStep(nextStep);
+  };
+
+  // Save accounts to Supabase (step 3 → 4)
+  const saveAccounts = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const validAccounts = accounts.filter((a) => a.name.trim() && a.balance && parseFloat(a.balance) >= 0);
+    if (validAccounts.length > 0) {
+      // Clear existing onboarding accounts and re-insert
+      await supabase.from("accounts").delete().eq("user_id", user.id);
+      await supabase.from("accounts").insert(
+        validAccounts.map((a) => ({
+          user_id: user.id,
+          name: a.name.trim(),
+          type: a.type,
+          balance: parseFloat(a.balance),
+        }))
+      );
+    }
   };
 
   const handleFinish = async () => {
@@ -92,7 +197,6 @@ const Onboarding = () => {
       onboarding_completed: true,
     };
 
-    // Try update first, fall back to upsert if no row exists
     const { error } = await supabase
       .from("profiles")
       .upsert(profileData as any, { onConflict: "user_id" });
@@ -104,38 +208,36 @@ const Onboarding = () => {
       return;
     }
 
-    // Save accounts
+    // Save accounts if not already saved
+    await saveAccounts();
+
+    // Save initial net worth snapshot
     const validAccounts = accounts.filter((a) => a.name.trim() && a.balance && parseFloat(a.balance) >= 0);
     if (validAccounts.length > 0) {
-      const { error: accError } = await supabase.from("accounts").insert(
-        validAccounts.map((a) => ({
-          user_id: user.id,
-          name: a.name.trim(),
-          type: a.type,
-          balance: parseFloat(a.balance),
-        }))
-      );
-      if (accError) {
-        console.error("Failed to save accounts:", accError);
-        // Don't block onboarding if accounts table doesn't exist yet
-      }
-
-      // Save initial net worth snapshot
       const netWorth = validAccounts.reduce((sum, a) => {
         const bal = parseFloat(a.balance) || 0;
         return sum + (a.type === "credit_card" ? -bal : bal);
       }, 0);
       const today = new Date().toISOString().split("T")[0];
-      await supabase.from("net_worth_snapshots").insert({
+      await supabase.from("net_worth_snapshots").upsert({
         user_id: user.id,
         total: netWorth,
         snapshot_date: today,
-      }).then(() => {}).catch(() => {});
+      } as any, { onConflict: "user_id,snapshot_date" }).then(() => {}).catch(() => {});
     }
 
     setLoading(false);
     navigate("/home");
   };
+
+  // Show loading while determining step
+  if (step === 0) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center px-5">
@@ -174,7 +276,10 @@ const Onboarding = () => {
               className="h-12 rounded-xl bg-card border-0 text-[15px] placeholder:text-muted-foreground"
               autoFocus
             />
-            <Button onClick={() => setStep(2)} className="w-full h-12 rounded-xl text-[15px] font-semibold">
+            <Button
+              onClick={() => goToStep(2, { display_name: displayName || null })}
+              className="w-full h-12 rounded-xl text-[15px] font-semibold"
+            >
               Continue
             </Button>
           </div>
@@ -225,7 +330,14 @@ const Onboarding = () => {
               <Button variant="outline" onClick={() => setStep(1)} className="flex-1 h-12 rounded-xl text-[15px]">
                 Back
               </Button>
-              <Button onClick={() => setStep(3)} className="flex-1 h-12 rounded-xl text-[15px] font-semibold">
+              <Button
+                onClick={() => goToStep(3, {
+                  monthly_income: monthlyIncome ? parseFloat(monthlyIncome) : null,
+                  pay_frequency: payFrequency || null,
+                  next_pay_date: nextPayDate || null,
+                })}
+                className="flex-1 h-12 rounded-xl text-[15px] font-semibold"
+              >
                 Continue
               </Button>
             </div>
@@ -310,7 +422,13 @@ const Onboarding = () => {
               <Button variant="outline" onClick={() => setStep(2)} className="flex-1 h-12 rounded-xl text-[15px]">
                 Back
               </Button>
-              <Button onClick={() => setStep(4)} className="flex-1 h-12 rounded-xl text-[15px] font-semibold">
+              <Button
+                onClick={async () => {
+                  await saveAccounts();
+                  setStep(4);
+                }}
+                className="flex-1 h-12 rounded-xl text-[15px] font-semibold"
+              >
                 Continue
               </Button>
             </div>
@@ -357,7 +475,14 @@ const Onboarding = () => {
               <Button variant="outline" onClick={() => setStep(3)} className="flex-1 h-12 rounded-xl text-[15px]">
                 Back
               </Button>
-              <Button onClick={() => setStep(5)} className="flex-1 h-12 rounded-xl text-[15px] font-semibold">
+              <Button
+                onClick={() => {
+                  const concerns = [...selectedConcerns];
+                  if (otherConcern.trim()) concerns.push(otherConcern.trim());
+                  goToStep(5, { spending_concerns: concerns.length > 0 ? concerns : null });
+                }}
+                className="flex-1 h-12 rounded-xl text-[15px] font-semibold"
+              >
                 Continue
               </Button>
             </div>
