@@ -95,7 +95,10 @@ const SpendingChart = ({ dailyData, weeklyData, monthlyData = [] }: SpendingChar
                 border: "1px solid hsl(var(--border))",
                 borderRadius: "0.75rem",
                 fontSize: "12px",
+                color: "hsl(var(--foreground))",
               }}
+              labelStyle={{ color: "hsl(var(--foreground))" }}
+              itemStyle={{ color: "hsl(var(--foreground))" }}
               cursor={{ fill: "hsl(var(--muted))", radius: 6 }}
             />
             <Bar dataKey="amount" radius={[6, 6, 0, 0]} maxBarSize={32}>
