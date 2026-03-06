@@ -18,6 +18,7 @@ import { format, parseISO, startOfMonth } from "date-fns";
 import PullToRefresh from "@/components/PullToRefresh";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { Button } from "@/components/ui/button";
+import { useTransactions, useSubscriptions, useInvalidateQueries } from "@/hooks/useSupabaseQueries";
 
 type Transaction = {
   id: string;
@@ -46,9 +47,10 @@ type FilterKey = "all" | "income" | "expense" | "subscriptions" | "scheduled";
 
 const Spending = () => {
   const { isPro } = useSubscription();
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: transactions = [], isLoading: txLoading, refetch: refetchTx } = useTransactions();
+  const { data: subscriptions = [], refetch: refetchSubs } = useSubscriptions();
+  const invalidate = useInvalidateQueries();
+
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<FilterKey>("all");
   const [addOpen, setAddOpen] = useState(false);
@@ -59,33 +61,14 @@ const Spending = () => {
   const [budgetSheetOpen, setBudgetSheetOpen] = useState(false);
   const [budgetRefreshKey, setBudgetRefreshKey] = useState(0);
 
-  const loadTransactions = useCallback(async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    const { data: txData, error } = await supabase.from("transactions").select("*").eq("user_id", user.id).order("date", { ascending: false });
-    if (error) {
-      console.error("Failed to load transactions:", error);
-      const { toast } = await import("sonner");
-      toast.error("Failed to load transactions");
-    }
-    if (txData) setTransactions(txData);
-    setLoading(false);
-  }, []);
-
-  const loadSubscriptions = useCallback(async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    const { data } = await supabase.from("subscriptions").select("*").eq("user_id", user.id).order("amount", { ascending: false });
-    if (data) setSubscriptions(data);
-  }, []);
+  const loading = txLoading && transactions.length === 0;
 
   const detectSubscriptions = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
     const expenses = transactions.filter((t) => t.type === "expense" && t.merchant);
-    const groups: Record<string, Transaction[]> = {};
+    const groups: Record<string, typeof transactions> = {};
     expenses.forEach((t) => {
       const key = (t.merchant || "").toLowerCase().trim();
       if (!key) return;
@@ -93,7 +76,7 @@ const Spending = () => {
       groups[key].push(t);
     });
 
-    const existingNames = new Set(subscriptions.map((s) => s.name.toLowerCase().trim()));
+    const existingNames = new Set(subscriptions.map((s: any) => s.name.toLowerCase().trim()));
     const newSubs: Array<{ name: string; amount: number; category: string | null; frequency: string; last_charged: string }> = [];
 
     for (const [, txs] of Object.entries(groups)) {
@@ -143,24 +126,15 @@ const Spending = () => {
           is_active: true,
         }))
       );
-      if (!error) loadSubscriptions();
+      if (!error) invalidate("subscriptions");
     }
-  }, [transactions, subscriptions, loadSubscriptions]);
-
-  useEffect(() => { loadTransactions(); }, [loadTransactions]);
+  }, [transactions, subscriptions, invalidate]);
 
   const handleRefresh = useCallback(async () => {
-    await loadTransactions();
-    await loadSubscriptions();
-  }, [loadTransactions, loadSubscriptions]);
+    await Promise.all([refetchTx(), refetchSubs()]);
+  }, [refetchTx, refetchSubs]);
 
   const { pullDistance, refreshing } = usePullToRefresh({ onRefresh: handleRefresh });
-
-  useEffect(() => {
-    if (filter === "subscriptions") {
-      loadSubscriptions();
-    }
-  }, [filter, loadSubscriptions]);
 
   useEffect(() => {
     if (filter === "subscriptions" && isPro && transactions.length > 0) {
@@ -272,7 +246,7 @@ const Spending = () => {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full h-11 rounded-xl bg-card pl-10 pr-4 text-[14px] text-foreground placeholder:text-muted-foreground outline-none"
-           
+
           />
         </div>
       )}
@@ -303,7 +277,7 @@ const Spending = () => {
       {isScheduledTab ? (
         <ScheduledTransactionsList />
       ) : isSubsTab ? (
-        subscriptions.length === 0 ? (
+        subscriptions.filter((s: any) => s.is_active !== false).length === 0 ? (
           <div className="rounded-2xl bg-card p-8 flex flex-col items-center text-center space-y-4 animate-fade-in">
             <div className="text-5xl">🔄</div>
             <h3 className="text-lg font-semibold text-foreground">No subscriptions detected yet</h3>
@@ -311,8 +285,8 @@ const Spending = () => {
           </div>
         ) : (
           <SubscriptionsList
-            subscriptions={subscriptions}
-            onRefresh={loadSubscriptions}
+            subscriptions={subscriptions as any}
+            onRefresh={() => invalidate("subscriptions")}
           />
         )
       ) : (
@@ -463,10 +437,10 @@ const Spending = () => {
         </>
       )}
 
-      <AddTransactionSheet open={addOpen} onOpenChange={setAddOpen} onSaved={loadTransactions} />
-      <TransactionDetailSheet transaction={detailTx} open={detailOpen} onOpenChange={setDetailOpen} onUpdated={loadTransactions} />
-      <AddSubscriptionSheet open={addSubOpen} onOpenChange={setAddSubOpen} onSaved={loadSubscriptions} />
-      <SetBudgetSheet open={budgetSheetOpen} onOpenChange={setBudgetSheetOpen} onSaved={() => setBudgetRefreshKey((k) => k + 1)} />
+      <AddTransactionSheet open={addOpen} onOpenChange={setAddOpen} onSaved={() => invalidate("transactions", "subscriptions")} />
+      <TransactionDetailSheet transaction={detailTx} open={detailOpen} onOpenChange={setDetailOpen} onUpdated={() => invalidate("transactions")} />
+      <AddSubscriptionSheet open={addSubOpen} onOpenChange={setAddSubOpen} onSaved={() => invalidate("subscriptions")} />
+      <SetBudgetSheet open={budgetSheetOpen} onOpenChange={setBudgetSheetOpen} onSaved={() => { invalidate("budgets"); setBudgetRefreshKey((k) => k + 1); }} />
     </div>
   );
 };

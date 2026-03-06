@@ -1,8 +1,9 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useTheme } from "next-themes";
 import { supabase } from "@/integrations/supabase/client";
 import { useSubscription } from "@/contexts/SubscriptionContext";
+import { useProfile as useProfileQuery, useInvalidateQueries } from "@/hooks/useSupabaseQueries";
 import { LogOut, Moon, Sun, ChevronRight, Pencil, Download, CreditCard, Sparkles, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +17,8 @@ const Profile = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { isPro, refreshSubscription } = useSubscription();
+  const { data: profileData, refetch: refetchProfile } = useProfileQuery();
+  const invalidate = useInvalidateQueries();
 
   const [email, setEmail] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -27,38 +30,37 @@ const Profile = () => {
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
   const [exportLoading, setExportLoading] = useState(false);
-  const [bankConnected, setBankConnected] = useState(false);
-  const [bankName, setBankName] = useState<string | null>(null);
   const [bankLastImported, setBankLastImported] = useState<string | null>(null);
 
-  // Memory fields
-  const [monthlyIncome, setMonthlyIncome] = useState<number | null>(null);
-  const [payFrequency, setPayFrequency] = useState<string | null>(null);
-  const [nextPayDate, setNextPayDate] = useState<string | null>(null);
-  const [spendingConcerns, setSpendingConcerns] = useState<string[] | null>(null);
-  const [personalContext, setPersonalContext] = useState<string | null>(null);
-  const [savingGoal, setSavingGoal] = useState<string | null>(null);
+  // Derive fields from cached profile
+  const bankConnected = !!(profileData as any)?.bank_connected;
+  const bankName = (profileData as any)?.bank_name || null;
+  const monthlyIncome = (profileData as any)?.monthly_income ?? null;
+  const payFrequency = (profileData as any)?.pay_frequency || null;
+  const nextPayDate = (profileData as any)?.next_pay_date || null;
+  const spendingConcerns = (profileData as any)?.spending_concerns || null;
+  const personalContext = (profileData as any)?.personal_context || null;
+  const savingGoal = (profileData as any)?.saving_goal || null;
 
-  const loadProfile = useCallback(async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    setEmail(user.email || "");
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("display_name, bank_connected, bank_name, monthly_income, saving_goal, pay_frequency, next_pay_date, spending_concerns, personal_context")
-      .eq("user_id", user.id)
-      .single();
-    if (data && !error) {
-      setDisplayName((data as any).display_name || "");
-      setBankConnected(!!(data as any).bank_connected);
-      setBankName((data as any).bank_name || null);
-      setMonthlyIncome((data as any).monthly_income);
-      setPayFrequency((data as any).pay_frequency || null);
-      setNextPayDate((data as any).next_pay_date || null);
-      setSpendingConcerns((data as any).spending_concerns || null);
-      setPersonalContext((data as any).personal_context || null);
-      setSavingGoal((data as any).saving_goal || null);
+  // Sync email and displayName from profile data + auth
+  useEffect(() => {
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) setEmail(user.email || "");
+    })();
+  }, []);
 
+  useEffect(() => {
+    if (profileData) {
+      setDisplayName((profileData as any).display_name || "");
+    }
+  }, [profileData]);
+
+  // Load bank last imported date
+  useEffect(() => {
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
       const { data: lastTx } = await supabase
         .from("transactions")
         .select("created_at")
@@ -67,14 +69,9 @@ const Profile = () => {
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
-
       setBankLastImported(lastTx?.created_at || null);
-    }
+    })();
   }, []);
-
-  useEffect(() => {
-    loadProfile();
-  }, [loadProfile]);
 
   useEffect(() => {
     if (searchParams.get("success") === "true") {
@@ -98,6 +95,7 @@ const Profile = () => {
     await supabase.from("profiles").update({ display_name: displayName }).eq("user_id", user.id);
     toast.success("Name updated");
     setEditingName(false);
+    invalidate("profile");
   };
 
   const handleUpgrade = async () => {
@@ -275,7 +273,7 @@ const Profile = () => {
         spendingConcerns={spendingConcerns}
         personalContext={personalContext}
         savingGoal={savingGoal}
-        onUpdated={loadProfile}
+        onUpdated={() => invalidate("profile")}
       />
 
       {/* CONNECTED ACCOUNTS section */}
@@ -283,7 +281,7 @@ const Profile = () => {
         bankConnected={bankConnected}
         bankName={bankName}
         lastImported={bankLastImported}
-        onStatusChange={() => loadProfile()}
+        onStatusChange={() => invalidate("profile")}
       />
 
       {/* PREFERENCES section */}

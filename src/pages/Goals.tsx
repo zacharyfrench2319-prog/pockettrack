@@ -1,6 +1,7 @@
-import { useEffect, useState, useCallback } from "react";
+import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useSubscription } from "@/contexts/SubscriptionContext";
+import { useGoals as useGoalsQuery, useInvalidateQueries } from "@/hooks/useSupabaseQueries";
 import { Plus, Pencil, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -60,8 +61,10 @@ const getGoalStatus = (goal: Goal): "on_track" | "behind" | "far_behind" => {
 
 const Goals = () => {
   const { isPro } = useSubscription();
-  const [goals, setGoals] = useState<Goal[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: goals = [], isLoading: goalsLoading, refetch: refetchGoals } = useGoalsQuery();
+  const invalidate = useInvalidateQueries();
+  const loading = goalsLoading && goals.length === 0;
+
   const [addOpen, setAddOpen] = useState(false);
   const [detailGoal, setDetailGoal] = useState<Goal | null>(null);
   const [editMode, setEditMode] = useState(false);
@@ -77,26 +80,7 @@ const Goals = () => {
   // Quick add money
   const [addAmount, setAddAmount] = useState("");
 
-  const loadGoals = useCallback(async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    const { data, error } = await supabase
-      .from("savings_goals")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false });
-    if (error) {
-      console.error("Failed to load goals:", error);
-      const { toast } = await import("sonner");
-      toast.error("Failed to load goals");
-    }
-    if (data) setGoals(data);
-    setLoading(false);
-  }, []);
-
-  useEffect(() => { loadGoals(); }, [loadGoals]);
-
-  const { pullDistance, refreshing } = usePullToRefresh({ onRefresh: loadGoals });
+  const { pullDistance, refreshing } = usePullToRefresh({ onRefresh: () => refetchGoals() });
 
   const resetForm = () => {
     setFormName("");
@@ -124,7 +108,7 @@ const Goals = () => {
     toast.success("Goal created!");
     setAddOpen(false);
     resetForm();
-    loadGoals();
+    invalidate("goals");
   };
 
   const handleUpdate = async () => {
@@ -144,7 +128,7 @@ const Goals = () => {
     if (error) { toast.error("Failed to update goal"); return; }
     toast.success("Goal updated!");
     setEditMode(false);
-    loadGoals();
+    invalidate("goals");
     setDetailGoal((prev) => prev ? { ...prev, name: formName, target_amount: parseFloat(formTarget), deadline: formDeadline ? format(formDeadline, "yyyy-MM-dd") : null, icon: formIcon } : null);
   };
 
@@ -154,7 +138,7 @@ const Goals = () => {
     if (error) { toast.error("Failed to delete goal"); return; }
     toast.success("Goal deleted");
     setDetailGoal(null);
-    loadGoals();
+    invalidate("goals");
   };
 
   const handleAddMoney = async () => {
@@ -169,7 +153,7 @@ const Goals = () => {
     toast.success(`Added $${parseFloat(addAmount).toFixed(2)}!`);
     setAddAmount("");
     setDetailGoal((prev) => prev ? { ...prev, current_amount: newAmount } : null);
-    loadGoals();
+    invalidate("goals");
   };
 
   const handleQuickAdd = async (goal: Goal) => {

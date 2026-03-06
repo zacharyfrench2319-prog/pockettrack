@@ -1,6 +1,5 @@
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
 import { getCategoryMeta } from "@/lib/categories";
 import CATEGORY_META from "@/lib/categories";
 import { formatAUD, formatSmartDate } from "@/lib/formatters";
@@ -17,94 +16,50 @@ import BudgetProgressCard from "@/components/BudgetProgressCard";
 import PullToRefresh from "@/components/PullToRefresh";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { useAutoChargeSubscriptions } from "@/hooks/useAutoChargeSubscriptions";
+import { useTransactions, useSubscriptions, useProfile, useGoals, useBudgets, useScheduledTransactions, useInvalidateQueries } from "@/hooks/useSupabaseQueries";
 import { Camera, Plus, Landmark, Sparkles, AlertTriangle, CalendarClock, Receipt, ShoppingBag, Wallet, BarChart3, Brain, Target, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { format, startOfWeek, endOfWeek, startOfMonth, subDays, parseISO } from "date-fns";
 
-type Transaction = {
-  id: string;
-  amount: number;
-  type: string;
-  category: string | null;
-  date: string;
-  description: string | null;
-  merchant: string | null;
-  source: string | null;
-};
-
-type Profile = {
-  display_name: string | null;
-  monthly_income: number | null;
-};
-
-type SavingsGoal = {
-  name: string;
-  target_amount: number;
-  current_amount: number | null;
-  deadline: string | null;
-  icon: string | null;
-  created_at: string | null;
-};
-
-type Budget = { category: string; amount: number };
-type ScheduledTx = { id: string; amount: number; type: string; category: string | null; merchant: string | null; description: string | null; next_date: string; frequency: string };
-
 const Home = () => {
   const navigate = useNavigate();
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [primaryGoal, setPrimaryGoal] = useState<SavingsGoal | null | undefined>(undefined);
-  const [subsTotal, setSubsTotal] = useState<number>(0);
-  const [loading, setLoading] = useState(true);
   const [addOpen, setAddOpen] = useState(false);
   const [coachOpen, setCoachOpen] = useState(false);
   const [budgetSheetOpen, setBudgetSheetOpen] = useState(false);
-  const [budgets, setBudgets] = useState<Budget[]>([]);
-  const [upcoming, setUpcoming] = useState<ScheduledTx[]>([]);
 
-  const loadData = useCallback(async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+  const { data: profile } = useProfile();
+  const { data: transactions = [], isLoading: txLoading, refetch: refetchTx } = useTransactions();
+  const { data: goalsData = [], isLoading: goalsLoading, refetch: refetchGoals } = useGoals();
+  const { data: subsData = [], refetch: refetchSubs } = useSubscriptions();
+  const { data: budgets = [], refetch: refetchBudgets } = useBudgets();
+  const { data: upcoming = [], refetch: refetchScheduled } = useScheduledTransactions();
+  const invalidate = useInvalidateQueries();
 
-    const [profileRes, txRes, goalsRes, subsRes, budgetsRes, scheduledRes] = await Promise.all([
-      supabase.from("profiles").select("display_name, monthly_income").eq("user_id", user.id).single(),
-      supabase.from("transactions").select("*").eq("user_id", user.id).order("date", { ascending: false }),
-      supabase.from("savings_goals").select("*").eq("user_id", user.id).order("created_at", { ascending: true }).limit(1),
-      supabase.from("subscriptions").select("amount, frequency").eq("user_id", user.id).eq("is_active", true),
-      supabase.from("budgets").select("category, amount").eq("user_id", user.id),
-      supabase.from("scheduled_transactions").select("*").eq("user_id", user.id).eq("is_active", true).order("next_date", { ascending: true }).limit(5),
-    ]);
+  const loading = txLoading && transactions.length === 0;
 
-    // Check for errors and notify user
-    const errors = [profileRes, txRes, goalsRes, subsRes, budgetsRes, scheduledRes].filter(r => r.error);
-    if (errors.length > 0) {
-      console.error("Home data fetch errors:", errors.map(e => e.error));
-      const { toast } = await import("sonner");
-      toast.error("Some data failed to load. Pull to refresh.");
-    }
+  const primaryGoal = goalsData.length > 0
+    ? goalsData.reduce((oldest, g) => {
+        if (!oldest) return g;
+        return (g.created_at || "") < (oldest.created_at || "") ? g : oldest;
+      }, goalsData[0])
+    : (goalsLoading ? undefined : null);
 
-    if (profileRes.data) setProfile(profileRes.data);
-    if (txRes.data) setTransactions(txRes.data);
-    setPrimaryGoal(goalsRes.data && goalsRes.data.length > 0 ? goalsRes.data[0] : null);
-    if (subsRes.data) {
-      const total = subsRes.data.reduce((sum, s) => {
-        if (s.frequency === "yearly") return sum + (s.amount as number) / 12;
-        if (s.frequency === "weekly") return sum + (s.amount as number) * 4.33;
-        return sum + (s.amount as number);
-      }, 0);
-      setSubsTotal(total);
-    }
-    if (budgetsRes.data) setBudgets(budgetsRes.data);
-    if (scheduledRes.data) setUpcoming(scheduledRes.data);
-    setLoading(false);
-  }, []);
+  const subsTotal = useMemo(() => {
+    const activeSubs = subsData.filter((s: any) => s.is_active);
+    return activeSubs.reduce((sum: number, s: any) => {
+      if (s.frequency === "yearly") return sum + (s.amount as number) / 12;
+      if (s.frequency === "weekly") return sum + (s.amount as number) * 4.33;
+      return sum + (s.amount as number);
+    }, 0);
+  }, [subsData]);
 
-  useEffect(() => { loadData(); }, [loadData]);
-
-  // Auto-log subscription expenses on their charge dates
   useAutoChargeSubscriptions();
 
-  const { pullDistance, refreshing } = usePullToRefresh({ onRefresh: loadData });
+  const handleRefresh = useCallback(async () => {
+    await Promise.all([refetchTx(), refetchSubs(), refetchGoals(), refetchBudgets(), refetchScheduled()]);
+  }, [refetchTx, refetchSubs, refetchGoals, refetchBudgets, refetchScheduled]);
+
+  const { pullDistance, refreshing } = usePullToRefresh({ onRefresh: handleRefresh });
 
   const now = new Date();
   const todayStr = format(now, "yyyy-MM-dd");
@@ -145,7 +100,6 @@ const Home = () => {
     [transactions, monthStart]
   );
 
-  // Budget alerts: categories at >= 80%
   const budgetAlerts = useMemo(() => {
     if (budgets.length === 0) return [];
     const catSpend: Record<string, number> = {};
@@ -238,7 +192,7 @@ const Home = () => {
                 key={card.label}
                 onClick={card.action}
                 className="rounded-2xl bg-card p-5 flex flex-col items-center gap-3 text-center active:scale-[0.97] transition-transform"
-               
+
               >
                 <div className={`w-12 h-12 rounded-xl ${card.color} flex items-center justify-center`}>
                   <card.icon size={22} className={card.iconColor} />
@@ -310,7 +264,7 @@ const Home = () => {
             <div
               onClick={() => navigate("/spending")}
               className="rounded-2xl bg-card p-3.5 flex items-center justify-between cursor-pointer active:scale-[0.98] transition-transform animate-fade-in"
-             
+
             >
               <div className="flex items-center gap-2">
                 <span className="text-base">🔄</span>
@@ -445,9 +399,9 @@ const Home = () => {
         </button>
       )}
 
-      <AddTransactionSheet open={addOpen} onOpenChange={setAddOpen} onSaved={loadData} />
+      <AddTransactionSheet open={addOpen} onOpenChange={setAddOpen} onSaved={() => invalidate("transactions", "subscriptions")} />
       <AiCoachSheet open={coachOpen} onOpenChange={setCoachOpen} />
-      <SetBudgetSheet open={budgetSheetOpen} onOpenChange={setBudgetSheetOpen} onSaved={loadData} />
+      <SetBudgetSheet open={budgetSheetOpen} onOpenChange={setBudgetSheetOpen} onSaved={() => invalidate("budgets")} />
     </div>
   );
 };

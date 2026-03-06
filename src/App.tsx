@@ -20,7 +20,15 @@ const Profile = lazy(() => import("./pages/Profile"));
 const Scan = lazy(() => import("./pages/Scan"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 2 * 60 * 1000, // 2 min — show cached data, refetch silently
+      gcTime: 10 * 60 * 1000,   // 10 min — keep unused cache
+      retry: 1,
+    },
+  },
+});
 
 const PageLoader = () => (
   <div className="px-6 sm:px-8 pt-safe-top pb-4">
