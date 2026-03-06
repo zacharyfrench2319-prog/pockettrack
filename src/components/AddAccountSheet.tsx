@@ -108,7 +108,7 @@ const AddAccountSheet = ({ open, onOpenChange, onSaved, editAccount }: AddAccoun
           />
 
           <Select value={type} onValueChange={setType}>
-            <SelectTrigger className="h-12 rounded-xl bg-muted border-0 text-[15px]">
+            <SelectTrigger className="h-12 rounded-xl bg-muted border-0 text-[15px] [&>span]:line-clamp-none [&>span]:overflow-visible">
               <SelectValue>
                 <span className="flex items-center gap-2">
                   <span>{ACCOUNT_TYPES.find((t) => t.value === type)?.emoji}</span>
