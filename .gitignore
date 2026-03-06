@@ -7,10 +7,16 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+.env
+.env.*
 node_modules
 dist
 dist-ssr
 *.local
+
+# Capacitor native projects
+ios
+android
 
 # Editor directories and files
 .vscode/*

@@ -28,7 +28,7 @@ serve(async (req) => {
     if (!image_base64) {
       return new Response(
         JSON.stringify({ error: "No image provided" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
@@ -48,15 +48,16 @@ serve(async (req) => {
               role: "user",
               parts: [
                 {
-                  text: `You are a receipt scanner. Extract the following from this receipt image and return JSON only, no other text:
+                  text: `You are a bank transaction reader. Extract the following from this bank transfer/payment screenshot and return JSON only, no other text:
 {
-  "store_name": "string",
+  "description": "string",
+  "merchant": "string",
+  "amount": number, // positive value
+  "type": "income" | "expense",
   "date": "YYYY-MM-DD",
-  "items": [{ "name": "string", "price": number }],
-  "total": number,
-  "category": "one of: groceries, eating_out, transport, entertainment, shopping, bills, health, other"
+  "category": "one of: groceries, eating_out, transport, entertainment, shopping, bills, health, subscriptions, other"
 }
-If you cannot read part of the receipt, make your best guess. Always return valid JSON.`,
+Always return valid JSON.`,
                 },
                 {
                   inlineData: {
@@ -75,14 +76,14 @@ If you cannot read part of the receipt, make your best guess. Always return vali
       if (response.status === 429) {
         return new Response(
           JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment." }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } },
         );
       }
       const errorText = await response.text();
       console.error("Gemini API error:", response.status, errorText);
       return new Response(
-        JSON.stringify({ error: "Failed to process receipt" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ error: "Failed to process transaction" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
@@ -92,11 +93,10 @@ If you cannot read part of the receipt, make your best guess. Always return vali
     if (!content) {
       return new Response(
         JSON.stringify({ error: "No response from AI" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
-    // Parse JSON from the response (handle markdown code blocks)
     let extracted;
     try {
       const jsonStr = content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
@@ -104,8 +104,8 @@ If you cannot read part of the receipt, make your best guess. Always return vali
     } catch {
       console.error("Failed to parse AI response:", content);
       return new Response(
-        JSON.stringify({ error: "Could not parse receipt data", raw: content }),
-        { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ error: "Could not parse transaction data", raw: content }),
+        { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
@@ -113,10 +113,10 @@ If you cannot read part of the receipt, make your best guess. Always return vali
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
-    console.error("scan-receipt error:", e);
+    console.error("scan-transaction error:", e);
     return new Response(
       JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
 });

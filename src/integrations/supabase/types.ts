@@ -14,6 +14,96 @@ export type Database = {
   }
   public: {
     Tables: {
+      accounts: {
+        Row: {
+          id: string
+          user_id: string
+          name: string
+          type: string
+          balance: number
+          currency: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          name: string
+          type?: string
+          balance?: number
+          currency?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          name?: string
+          type?: string
+          balance?: number
+          currency?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      budgets: {
+        Row: {
+          id: string
+          user_id: string
+          category: string
+          amount: number
+          period: string | null
+          start_date: string | null
+          end_date: string | null
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          category: string
+          amount: number
+          period?: string | null
+          start_date?: string | null
+          end_date?: string | null
+          created_at?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          category?: string
+          amount?: number
+          period?: string | null
+          start_date?: string | null
+          end_date?: string | null
+          created_at?: string | null
+        }
+        Relationships: []
+      }
+      net_worth_snapshots: {
+        Row: {
+          id: string
+          user_id: string
+          total: number
+          snapshot_date: string
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          total: number
+          snapshot_date?: string
+          created_at?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          total?: number
+          snapshot_date?: string
+          created_at?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           bank_connected: boolean | null
@@ -107,6 +197,48 @@ export type Database = {
         }
         Relationships: []
       }
+      scheduled_transactions: {
+        Row: {
+          id: string
+          user_id: string
+          amount: number
+          type: string
+          category: string | null
+          description: string | null
+          merchant: string | null
+          frequency: string
+          next_date: string
+          is_active: boolean | null
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          amount: number
+          type?: string
+          category?: string | null
+          description?: string | null
+          merchant?: string | null
+          frequency?: string
+          next_date: string
+          is_active?: boolean | null
+          created_at?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          amount?: number
+          type?: string
+          category?: string | null
+          description?: string | null
+          merchant?: string | null
+          frequency?: string
+          next_date?: string
+          is_active?: boolean | null
+          created_at?: string | null
+        }
+        Relationships: []
+      }
       scans: {
         Row: {
           created_at: string | null
@@ -149,6 +281,7 @@ export type Database = {
           id: string
           is_active: boolean | null
           last_charged: string | null
+          next_charge_date: string | null
           name: string
           user_id: string
         }
@@ -160,6 +293,7 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           last_charged?: string | null
+          next_charge_date?: string | null
           name: string
           user_id: string
         }
@@ -171,6 +305,7 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           last_charged?: string | null
+          next_charge_date?: string | null
           name?: string
           user_id?: string
         }

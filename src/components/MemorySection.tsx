@@ -59,7 +59,7 @@ const MemorySection = ({
       <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider px-1 flex items-center gap-1.5">
         <Brain size={12} /> Memory
       </p>
-      <div className="rounded-2xl bg-card overflow-hidden" style={{ boxShadow: "var(--card-shadow)" }}>
+      <div className="rounded-2xl bg-card overflow-hidden">
         {rows.map((row, i) => (
           <div key={row.field} className={`px-5 py-3.5 ${i > 0 ? "border-t border-border/40" : ""}`}>
             {editing === row.field ? (

@@ -8,10 +8,15 @@ import AddTransactionSheet from "@/components/AddTransactionSheet";
 import TransactionDetailSheet from "@/components/TransactionDetailSheet";
 import AddSubscriptionSheet from "@/components/AddSubscriptionSheet";
 import SubscriptionsList from "@/components/SubscriptionsList";
+import BudgetProgressCard from "@/components/BudgetProgressCard";
+import ScheduledTransactionsList from "@/components/ScheduledTransactionsList";
+import SetBudgetSheet from "@/components/SetBudgetSheet";
 import { TransactionListSkeleton } from "@/components/Skeletons";
-import { Plus, Search, ChevronDown, ChevronUp, Landmark } from "lucide-react";
+import { Plus, Search, ChevronDown, ChevronUp, Landmark, Target } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell } from "recharts";
 import { format, parseISO, startOfMonth } from "date-fns";
+import PullToRefresh from "@/components/PullToRefresh";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { Button } from "@/components/ui/button";
 
 type Transaction = {
@@ -33,10 +38,11 @@ export type Subscription = {
   frequency: string | null;
   is_active: boolean | null;
   last_charged: string | null;
+  next_charge_date: string | null;
   created_at: string | null;
 };
 
-type FilterKey = "all" | "income" | "expense" | "subscriptions";
+type FilterKey = "all" | "income" | "expense" | "subscriptions" | "scheduled";
 
 const Spending = () => {
   const { isPro } = useSubscription();
@@ -50,12 +56,19 @@ const Spending = () => {
   const [detailTx, setDetailTx] = useState<Transaction | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [breakdownOpen, setBreakdownOpen] = useState(false);
+  const [budgetSheetOpen, setBudgetSheetOpen] = useState(false);
+  const [budgetRefreshKey, setBudgetRefreshKey] = useState(0);
 
   const loadTransactions = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    const { data: txData } = await supabase.from("transactions").select("*").eq("user_id", user.id).order("date", { ascending: false });
+    const { data: txData, error } = await supabase.from("transactions").select("*").eq("user_id", user.id).order("date", { ascending: false });
+    if (error) {
+      console.error("Failed to load transactions:", error);
+      const { toast } = await import("sonner");
+      toast.error("Failed to load transactions");
+    }
     if (txData) setTransactions(txData);
     setLoading(false);
   }, []);
@@ -136,23 +149,30 @@ const Spending = () => {
 
   useEffect(() => { loadTransactions(); }, [loadTransactions]);
 
+  const handleRefresh = useCallback(async () => {
+    await loadTransactions();
+    await loadSubscriptions();
+  }, [loadTransactions, loadSubscriptions]);
+
+  const { pullDistance, refreshing } = usePullToRefresh({ onRefresh: handleRefresh });
+
   useEffect(() => {
-    if (filter === "subscriptions" && isPro) {
+    if (filter === "subscriptions") {
       loadSubscriptions();
     }
-  }, [filter, isPro, loadSubscriptions]);
+  }, [filter, loadSubscriptions]);
 
   useEffect(() => {
     if (filter === "subscriptions" && isPro && transactions.length > 0) {
       detectSubscriptions();
     }
-  }, [filter, isPro, transactions.length]);
+  }, [filter, isPro, transactions.length, detectSubscriptions]);
 
   const filtered = useMemo(() => {
     let list = transactions;
     if (filter === "income") list = list.filter((t) => t.type === "income");
     if (filter === "expense") list = list.filter((t) => t.type === "expense");
-    if (search.trim() && filter !== "subscriptions") {
+    if (search.trim() && filter !== "subscriptions" && filter !== "scheduled") {
       const q = search.toLowerCase();
       list = list.filter(
         (t) =>
@@ -202,32 +222,48 @@ const Spending = () => {
       }));
   }, [transactions]);
 
-  const maxMonthly = Math.max(...monthlyData.map((d) => d.amount), 1);
-
   const filters: Array<{ key: FilterKey; label: string }> = [
     { key: "all", label: "All" },
     { key: "income", label: "Income" },
     { key: "expense", label: "Expenses" },
     { key: "subscriptions", label: "Subs" },
+    { key: "scheduled", label: "Scheduled" },
   ];
 
   const isSubsTab = filter === "subscriptions";
+  const isScheduledTab = filter === "scheduled";
+
+  const handleAddClick = () => {
+    if (isSubsTab) setAddSubOpen(true);
+    else setAddOpen(true);
+  };
 
   return (
-    <div className="px-5 pt-14 pb-4 space-y-4">
+    <div className="px-6 sm:px-8 pt-safe-top pb-4 space-y-4">
+      <PullToRefresh pullDistance={pullDistance} refreshing={refreshing} />
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-[28px] font-bold text-foreground">Spending</h1>
-        <button
-          onClick={() => isSubsTab && isPro ? setAddSubOpen(true) : setAddOpen(true)}
-          className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center"
-        >
-          <Plus size={20} className="text-primary-foreground" />
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setBudgetSheetOpen(true)}
+            className="w-9 h-9 rounded-xl bg-primary/15 flex items-center justify-center"
+          >
+            <Target size={18} className="text-primary" />
+          </button>
+          {!isScheduledTab && (
+            <button
+              onClick={handleAddClick}
+              className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center"
+            >
+              <Plus size={20} className="text-primary-foreground" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Search */}
-      {!isSubsTab && (
+      {!isSubsTab && !isScheduledTab && (
         <div className="relative">
           <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <input
@@ -236,18 +272,18 @@ const Spending = () => {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full h-11 rounded-xl bg-card pl-10 pr-4 text-[14px] text-foreground placeholder:text-muted-foreground outline-none"
-            style={{ boxShadow: "var(--card-shadow)" }}
+           
           />
         </div>
       )}
 
       {/* Filter Tabs */}
-      <div className="flex gap-2">
+      <div className="flex gap-2 overflow-x-auto">
         {filters.map((f) => (
           <button
             key={f.key}
             onClick={() => setFilter(f.key)}
-            className={`px-4 py-1.5 rounded-full text-[12px] font-medium transition-colors ${
+            className={`px-4 py-1.5 rounded-full text-[12px] font-medium transition-colors whitespace-nowrap ${
               filter === f.key
                 ? "bg-primary/15 text-primary"
                 : "bg-card text-muted-foreground"
@@ -258,18 +294,17 @@ const Spending = () => {
         ))}
       </div>
 
-      {/* SUBSCRIPTIONS TAB */}
-      {isSubsTab ? (
-        !isPro ? (
-          <div className="rounded-2xl bg-card p-8 flex flex-col items-center text-center space-y-4 animate-fade-in" style={{ boxShadow: "var(--card-shadow)" }}>
-            <div className="text-5xl">🔄</div>
-            <h3 className="text-lg font-semibold text-foreground">Subscription Detector</h3>
-            <p className="text-sm text-muted-foreground">
-              Automatically detect recurring charges and track your subscriptions. Available with Pro.
-            </p>
-          </div>
-        ) : subscriptions.length === 0 ? (
-          <div className="rounded-2xl bg-card p-8 flex flex-col items-center text-center space-y-4 animate-fade-in" style={{ boxShadow: "var(--card-shadow)" }}>
+      {/* Budget Progress */}
+      {!isSubsTab && !isScheduledTab && (
+        <BudgetProgressCard key={budgetRefreshKey} transactions={transactions} />
+      )}
+
+      {/* SCHEDULED TAB */}
+      {isScheduledTab ? (
+        <ScheduledTransactionsList />
+      ) : isSubsTab ? (
+        subscriptions.length === 0 ? (
+          <div className="rounded-2xl bg-card p-8 flex flex-col items-center text-center space-y-4 animate-fade-in">
             <div className="text-5xl">🔄</div>
             <h3 className="text-lg font-semibold text-foreground">No subscriptions detected yet</h3>
             <p className="text-sm text-muted-foreground">Add transactions to start — we'll automatically detect recurring charges</p>
@@ -286,7 +321,7 @@ const Spending = () => {
           {loading ? (
             <TransactionListSkeleton />
           ) : filtered.length === 0 ? (
-            <div className="rounded-2xl bg-card p-8 flex flex-col items-center text-center space-y-4 animate-fade-in" style={{ boxShadow: "var(--card-shadow)" }}>
+            <div className="rounded-2xl bg-card p-8 flex flex-col items-center text-center space-y-4 animate-fade-in">
               <div className="text-5xl">📝</div>
               <h3 className="text-lg font-semibold text-foreground">
                 {search || filter !== "all" ? "No matching transactions" : "No transactions yet"}
@@ -301,7 +336,7 @@ const Spending = () => {
               )}
             </div>
           ) : (
-            <div className="rounded-2xl bg-card overflow-hidden" style={{ boxShadow: "var(--card-shadow)" }}>
+            <div className="rounded-2xl bg-card overflow-hidden">
               {filtered.map((tx, i) => {
                 const meta = getCategoryMeta(tx.category, tx.type);
                 const isIncome = tx.type === "income";
@@ -359,7 +394,7 @@ const Spending = () => {
               </button>
 
               {breakdownOpen && (
-                <div className="rounded-2xl bg-card p-4 space-y-3" style={{ boxShadow: "var(--card-shadow)" }}>
+                <div className="rounded-2xl bg-card p-4 space-y-3">
                   {categoryBreakdown.map((item) => (
                     <div key={item.category} className="space-y-1.5">
                       <div className="flex items-center justify-between">
@@ -394,7 +429,7 @@ const Spending = () => {
           {monthlyData.length > 1 && (
             <div className="space-y-3 animate-fade-in" style={{ animationDelay: "300ms", animationFillMode: "both" }}>
               <h2 className="text-lg font-semibold text-foreground">Monthly Comparison</h2>
-              <div className="rounded-2xl bg-card p-5" style={{ boxShadow: "var(--card-shadow)" }}>
+              <div className="rounded-2xl bg-card p-5">
                 <div className="h-40">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={monthlyData} barCategoryGap="20%">
@@ -431,6 +466,7 @@ const Spending = () => {
       <AddTransactionSheet open={addOpen} onOpenChange={setAddOpen} onSaved={loadTransactions} />
       <TransactionDetailSheet transaction={detailTx} open={detailOpen} onOpenChange={setDetailOpen} onUpdated={loadTransactions} />
       <AddSubscriptionSheet open={addSubOpen} onOpenChange={setAddSubOpen} onSaved={loadSubscriptions} />
+      <SetBudgetSheet open={budgetSheetOpen} onOpenChange={setBudgetSheetOpen} onSaved={() => setBudgetRefreshKey((k) => k + 1)} />
     </div>
   );
 };

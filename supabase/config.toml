@@ -23,3 +23,15 @@ verify_jwt = false
 
 [functions.basiq-sync]
 verify_jwt = false
+
+[functions.ai-coach]
+verify_jwt = false
+
+[functions.scan-transaction]
+verify_jwt = false
+
+[functions.scan-bank-screenshot]
+verify_jwt = false
+
+[functions.redeem-code]
+verify_jwt = false

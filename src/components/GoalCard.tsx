@@ -26,7 +26,7 @@ const GoalCard = ({ goal }: GoalCardProps) => {
       <div
         onClick={() => navigate("/goals")}
         className="rounded-2xl bg-card p-4 flex items-center gap-3 cursor-pointer active:scale-[0.98] transition-transform"
-        style={{ boxShadow: "var(--card-shadow)" }}
+       
       >
         <div className="w-11 h-11 rounded-full bg-primary/15 flex items-center justify-center text-xl">🎯</div>
         <div>
@@ -44,7 +44,7 @@ const GoalCard = ({ goal }: GoalCardProps) => {
     <div
       onClick={() => navigate("/goals")}
       className="rounded-2xl bg-card p-4 flex items-center gap-3 cursor-pointer active:scale-[0.98] transition-transform"
-      style={{ boxShadow: "var(--card-shadow)" }}
+     
     >
       <GoalProgressRing percent={percent} size={44} strokeWidth={4} showLabel={false} />
       <div className="flex-1 min-w-0">

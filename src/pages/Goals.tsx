@@ -14,6 +14,8 @@ import { cn } from "@/lib/utils";
 import GoalProgressRing from "@/components/GoalProgressRing";
 import UpgradeModal from "@/components/UpgradeModal";
 import { GoalsSkeleton } from "@/components/Skeletons";
+import PullToRefresh from "@/components/PullToRefresh";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 
 type Goal = {
   id: string;
@@ -78,16 +80,23 @@ const Goals = () => {
   const loadGoals = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("savings_goals")
       .select("*")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false });
+    if (error) {
+      console.error("Failed to load goals:", error);
+      const { toast } = await import("sonner");
+      toast.error("Failed to load goals");
+    }
     if (data) setGoals(data);
     setLoading(false);
   }, []);
 
   useEffect(() => { loadGoals(); }, [loadGoals]);
+
+  const { pullDistance, refreshing } = usePullToRefresh({ onRefresh: loadGoals });
 
   const resetForm = () => {
     setFormName("");
@@ -181,7 +190,8 @@ const Goals = () => {
   if (loading) return <GoalsSkeleton />;
 
   return (
-    <div className="px-5 pt-14 pb-4 space-y-4">
+    <div className="px-6 sm:px-8 pt-safe-top pb-4 space-y-4">
+      <PullToRefresh pullDistance={pullDistance} refreshing={refreshing} />
       {/* Header */}
       <div className="flex items-center justify-between animate-fade-in">
         <h1 className="text-[28px] font-bold text-foreground">Goals</h1>
@@ -203,7 +213,7 @@ const Goals = () => {
       </div>
 
       {goals.length === 0 ? (
-        <div className="rounded-2xl bg-card p-8 flex flex-col items-center text-center space-y-4 animate-fade-in" style={{ boxShadow: "var(--card-shadow)" }}>
+        <div className="rounded-2xl bg-card p-8 flex flex-col items-center text-center space-y-4 animate-fade-in">
           <div className="text-5xl">🎯</div>
           <h3 className="text-lg font-semibold text-foreground">Set your first savings goal</h3>
           <p className="text-sm text-muted-foreground">Track your progress towards the things that matter most</p>
@@ -253,7 +263,7 @@ const Goals = () => {
 
       {/* ADD GOAL SHEET */}
       <Sheet open={addOpen} onOpenChange={setAddOpen}>
-        <SheetContent side="bottom" className="rounded-t-3xl max-h-[90vh] overflow-y-auto">
+        <SheetContent side="bottom" className="rounded-t-3xl bg-card border-0 h-[90vh] overflow-y-auto px-6 sm:px-8 pb-8">
           <SheetHeader>
             <SheetTitle>Create Goal</SheetTitle>
             <SheetDescription>Set a new savings target</SheetDescription>
@@ -314,7 +324,7 @@ const Goals = () => {
 
       {/* GOAL DETAIL SHEET */}
       <Sheet open={!!detailGoal} onOpenChange={(open) => { if (!open) { setDetailGoal(null); setEditMode(false); } }}>
-        <SheetContent side="bottom" className="rounded-t-3xl max-h-[90vh] overflow-y-auto">
+        <SheetContent side="bottom" className="rounded-t-3xl bg-card border-0 h-[90vh] overflow-y-auto px-6 sm:px-8 pb-8">
           {detailGoal && !editMode && (() => {
             const percent = detailGoal.target_amount > 0 ? ((detailGoal.current_amount || 0) / detailGoal.target_amount) * 100 : 0;
             const daysLeft = detailGoal.deadline ? Math.max(differenceInDays(parseISO(detailGoal.deadline), new Date()), 0) : null;

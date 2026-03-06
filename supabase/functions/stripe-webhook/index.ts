@@ -30,18 +30,32 @@ serve(async (req) => {
     { auth: { persistSession: false } }
   );
 
+  // Look up user ID by email — queries auth.users table via admin API
+  async function findUserIdByEmail(email: string): Promise<string | null> {
+    // Supabase admin listUsers supports pagination; fetch in pages until found
+    let page = 1;
+    const perPage = 500;
+    while (true) {
+      const { data: userList } = await supabaseClient.auth.admin.listUsers({ page, perPage });
+      if (!userList?.users?.length) return null;
+      const match = userList.users.find((u) => u.email === email);
+      if (match) return match.id;
+      if (userList.users.length < perPage) return null; // last page
+      page++;
+    }
+  }
+
   try {
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
         const customerEmail = session.customer_details?.email;
         if (customerEmail) {
-          const { data: users } = await supabaseClient.auth.admin.listUsers();
-          const user = users?.users?.find((u) => u.email === customerEmail);
-          if (user) {
+          const userId = await findUserIdByEmail(customerEmail);
+          if (userId) {
             await supabaseClient.from("profiles")
               .update({ subscription_status: "pro" })
-              .eq("user_id", user.id);
+              .eq("user_id", userId);
           }
         }
         break;
@@ -52,13 +66,12 @@ serve(async (req) => {
         const customer = await stripe.customers.retrieve(customerId);
         const email = (customer as Stripe.Customer).email;
         if (email) {
-          const { data: users } = await supabaseClient.auth.admin.listUsers();
-          const user = users?.users?.find((u) => u.email === email);
-          if (user) {
+          const userId = await findUserIdByEmail(email);
+          if (userId) {
             const isActive = ["active", "trialing"].includes(subscription.status);
             await supabaseClient.from("profiles")
               .update({ subscription_status: isActive ? "pro" : "free" })
-              .eq("user_id", user.id);
+              .eq("user_id", userId);
           }
         }
         break;
@@ -69,12 +82,11 @@ serve(async (req) => {
         const customer = await stripe.customers.retrieve(customerId);
         const email = (customer as Stripe.Customer).email;
         if (email) {
-          const { data: users } = await supabaseClient.auth.admin.listUsers();
-          const user = users?.users?.find((u) => u.email === email);
-          if (user) {
+          const userId = await findUserIdByEmail(email);
+          if (userId) {
             await supabaseClient.from("profiles")
               .update({ subscription_status: "free" })
-              .eq("user_id", user.id);
+              .eq("user_id", userId);
           }
         }
         break;

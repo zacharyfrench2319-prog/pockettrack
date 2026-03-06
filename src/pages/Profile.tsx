@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useTheme } from "next-themes";
 import { supabase } from "@/integrations/supabase/client";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { LogOut, Moon, Sun, ChevronRight, Pencil, Download, CreditCard, Sparkles, Trash2 } from "lucide-react";
@@ -19,7 +20,8 @@ const Profile = () => {
   const [email, setEmail] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [editingName, setEditingName] = useState(false);
-  const [isDark, setIsDark] = useState(true);
+  const { theme, setTheme } = useTheme();
+  const isDark = theme === "dark";
   const [redeemOpen, setRedeemOpen] = useState(false);
   const [redeemCode, setRedeemCode] = useState("");
   const [checkoutLoading, setCheckoutLoading] = useState(false);
@@ -27,6 +29,7 @@ const Profile = () => {
   const [exportLoading, setExportLoading] = useState(false);
   const [bankConnected, setBankConnected] = useState(false);
   const [bankName, setBankName] = useState<string | null>(null);
+  const [bankLastImported, setBankLastImported] = useState<string | null>(null);
 
   // Memory fields
   const [monthlyIncome, setMonthlyIncome] = useState<number | null>(null);
@@ -40,12 +43,12 @@ const Profile = () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
     setEmail(user.email || "");
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("profiles")
       .select("display_name, bank_connected, bank_name, monthly_income, saving_goal, pay_frequency, next_pay_date, spending_concerns, personal_context")
       .eq("user_id", user.id)
       .single();
-    if (data) {
+    if (data && !error) {
       setDisplayName((data as any).display_name || "");
       setBankConnected(!!(data as any).bank_connected);
       setBankName((data as any).bank_name || null);
@@ -55,12 +58,21 @@ const Profile = () => {
       setSpendingConcerns((data as any).spending_concerns || null);
       setPersonalContext((data as any).personal_context || null);
       setSavingGoal((data as any).saving_goal || null);
+
+      const { data: lastTx } = await supabase
+        .from("transactions")
+        .select("created_at")
+        .eq("user_id", user.id)
+        .eq("source", "bank")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      setBankLastImported(lastTx?.created_at || null);
     }
   }, []);
 
   useEffect(() => {
-    const dark = document.documentElement.classList.contains("dark");
-    setIsDark(dark);
     loadProfile();
   }, [loadProfile]);
 
@@ -72,9 +84,7 @@ const Profile = () => {
   }, [searchParams, refreshSubscription]);
 
   const toggleTheme = () => {
-    const next = !isDark;
-    setIsDark(next);
-    document.documentElement.classList.toggle("dark", next);
+    setTheme(isDark ? "light" : "dark");
   };
 
   const handleLogout = async () => {
@@ -107,18 +117,17 @@ const Profile = () => {
   };
 
   const handleRedeem = async () => {
-    if (redeemCode.trim() === "POCKETTRACK2026") {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const { error } = await supabase.from("profiles").update({ subscription_status: "pro" }).eq("user_id", user.id);
-      if (error) { toast.error("Failed to redeem code"); return; }
-      setRedeemOpen(false);
-      setRedeemCode("");
-      await refreshSubscription();
-      toast.success("Pro unlocked! 🎉");
-    } else {
-      toast.error("Invalid code");
+    const { data, error } = await supabase.functions.invoke("redeem-code", {
+      body: { code: redeemCode.trim() },
+    });
+    if (error || data?.error) {
+      toast.error(data?.error || "Invalid code");
+      return;
     }
+    setRedeemOpen(false);
+    setRedeemCode("");
+    await refreshSubscription();
+    toast.success("Pro unlocked! 🎉");
   };
 
   const handleExport = async () => {
@@ -163,6 +172,10 @@ const Profile = () => {
       supabase.from("savings_goals").delete().eq("user_id", user.id),
       supabase.from("scans").delete().eq("user_id", user.id),
       supabase.from("subscriptions").delete().eq("user_id", user.id),
+      supabase.from("budgets").delete().eq("user_id", user.id),
+      supabase.from("scheduled_transactions").delete().eq("user_id", user.id),
+      supabase.from("accounts").delete().eq("user_id", user.id),
+      supabase.from("net_worth_snapshots").delete().eq("user_id", user.id),
       supabase.from("profiles").delete().eq("user_id", user.id),
     ]);
     await supabase.auth.signOut();
@@ -171,7 +184,7 @@ const Profile = () => {
   };
 
   return (
-    <div className="px-5 pt-14 pb-4 space-y-4">
+    <div className="px-6 sm:px-8 pt-safe-top pb-4 space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-[28px] font-bold text-foreground">Profile</h1>
         {isPro && (
@@ -183,7 +196,7 @@ const Profile = () => {
       </div>
 
       {/* User Card */}
-      <div className="rounded-2xl bg-card p-5 flex items-center gap-4" style={{ boxShadow: "var(--card-shadow)" }}>
+      <div className="rounded-2xl bg-card p-5 flex items-center gap-4">
         <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
           <span className="text-lg font-bold text-primary">
             {displayName ? displayName[0].toUpperCase() : email ? email[0].toUpperCase() : "?"}
@@ -209,7 +222,7 @@ const Profile = () => {
 
       {/* Upgrade Card (free users only) */}
       {!isPro && (
-        <div className="rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 p-5 space-y-3" style={{ boxShadow: "var(--card-shadow)" }}>
+        <div className="rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 p-5 space-y-3">
           <div className="flex items-center gap-2">
             <Sparkles size={20} className="text-primary" />
             <h3 className="text-[16px] font-bold text-foreground">Upgrade to PocketTrack Pro</h3>
@@ -230,7 +243,7 @@ const Profile = () => {
       {/* ACCOUNT section */}
       <div className="space-y-1">
         <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider px-1">Account</p>
-        <div className="rounded-2xl bg-card overflow-hidden" style={{ boxShadow: "var(--card-shadow)" }}>
+        <div className="rounded-2xl bg-card overflow-hidden">
           <button onClick={() => setEditingName(true)} className="w-full flex items-center gap-3 px-5 py-3.5 hover:bg-muted/50 transition-colors">
             <Pencil size={20} className="text-muted-foreground" />
             <span className="flex-1 text-[15px] text-foreground text-left">Edit Profile</span>
@@ -269,13 +282,14 @@ const Profile = () => {
       <ConnectedAccountsSection
         bankConnected={bankConnected}
         bankName={bankName}
+        lastImported={bankLastImported}
         onStatusChange={() => loadProfile()}
       />
 
       {/* PREFERENCES section */}
       <div className="space-y-1">
         <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider px-1">Preferences</p>
-        <div className="rounded-2xl bg-card overflow-hidden" style={{ boxShadow: "var(--card-shadow)" }}>
+        <div className="rounded-2xl bg-card overflow-hidden">
           <button onClick={toggleTheme} className="w-full flex items-center gap-3 px-5 py-3.5 hover:bg-muted/50 transition-colors">
             {isDark ? <Sun size={20} className="text-muted-foreground" /> : <Moon size={20} className="text-muted-foreground" />}
             <span className="flex-1 text-[15px] text-foreground text-left">{isDark ? "Light Mode" : "Dark Mode"}</span>

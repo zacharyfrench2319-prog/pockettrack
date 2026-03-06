@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { getCategoryMeta } from "@/lib/categories";
-import { differenceInDays, parseISO } from "date-fns";
+import { differenceInDays, parseISO, format } from "date-fns";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+import { RefreshCw } from "lucide-react";
 import type { Subscription } from "@/pages/Spending";
 
 interface SubscriptionsListProps {
@@ -17,7 +18,9 @@ const SubscriptionsList = ({ subscriptions, onRefresh }: SubscriptionsListProps)
   const activeSubs = subscriptions.filter((s) => s.is_active !== false);
   const totalMonthly = activeSubs.reduce((sum, s) => {
     if (s.frequency === "yearly") return sum + s.amount / 12;
+    if (s.frequency === "quarterly") return sum + s.amount / 3;
     if (s.frequency === "weekly") return sum + s.amount * 4.33;
+    if (s.frequency === "fortnightly") return sum + s.amount * 2.17;
     return sum + s.amount;
   }, 0);
 
@@ -44,6 +47,8 @@ const SubscriptionsList = ({ subscriptions, onRefresh }: SubscriptionsListProps)
 
   const freqLabel = (f: string | null) => {
     if (f === "weekly") return "Weekly";
+    if (f === "fortnightly") return "Fortnightly";
+    if (f === "quarterly") return "Quarterly";
     if (f === "yearly") return "Yearly";
     return "Monthly";
   };
@@ -51,7 +56,7 @@ const SubscriptionsList = ({ subscriptions, onRefresh }: SubscriptionsListProps)
   return (
     <div className="space-y-4">
       {/* Total Card */}
-      <div className="rounded-2xl bg-card p-5 text-center space-y-1" style={{ boxShadow: "var(--card-shadow)" }}>
+      <div className="rounded-2xl bg-card p-5 text-center space-y-1">
         <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Monthly Subscriptions</p>
         <p className="text-[28px] font-bold text-foreground">
           ${totalMonthly.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}<span className="text-[15px] text-muted-foreground font-medium">/mo</span>
@@ -59,13 +64,21 @@ const SubscriptionsList = ({ subscriptions, onRefresh }: SubscriptionsListProps)
         <p className="text-xs text-muted-foreground">{activeSubs.length} active subscription{activeSubs.length !== 1 ? "s" : ""}</p>
       </div>
 
+      {/* Auto-charge info */}
+      <div className="rounded-xl bg-primary/5 border border-primary/10 p-3 flex items-start gap-2.5">
+        <RefreshCw size={14} className="text-primary mt-0.5 shrink-0" />
+        <p className="text-[12px] text-muted-foreground leading-relaxed">
+          Subscriptions are automatically logged as expenses on their charge date.
+        </p>
+      </div>
+
       {/* Subscription List */}
       {activeSubs.length === 0 ? (
-        <div className="rounded-2xl bg-card p-6 text-center" style={{ boxShadow: "var(--card-shadow)" }}>
+        <div className="rounded-2xl bg-card p-6 text-center">
           <p className="text-sm text-muted-foreground">No subscriptions detected yet. Add transactions to start detecting.</p>
         </div>
       ) : (
-        <div className="rounded-2xl bg-card overflow-hidden" style={{ boxShadow: "var(--card-shadow)" }}>
+        <div className="rounded-2xl bg-card overflow-hidden">
           {activeSubs.map((sub, i) => {
             const meta = getCategoryMeta(sub.category, "expense");
             const badge = getBadge(sub);
@@ -88,7 +101,12 @@ const SubscriptionsList = ({ subscriptions, onRefresh }: SubscriptionsListProps)
                     <p className="text-[14px] font-medium text-foreground truncate">{sub.name}</p>
                     {badge}
                   </div>
-                  <p className="text-[11px] text-muted-foreground">{freqLabel(sub.frequency)}</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {freqLabel(sub.frequency)}
+                    {sub.next_charge_date && (
+                      <> · Next: {format(parseISO(sub.next_charge_date), "d MMM")}</>
+                    )}
+                  </p>
                 </div>
                 <div className="text-right shrink-0 flex items-center gap-2">
                   <div>

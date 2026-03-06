@@ -17,7 +17,7 @@ const SpendingChart = ({ dailyData, weeklyData }: SpendingChartProps) => {
   const maxAmount = Math.max(...data.map((d) => d.amount), 1);
 
   return (
-    <div className="rounded-2xl bg-card p-5 space-y-4" style={{ boxShadow: "var(--card-shadow)" }}>
+    <div className="rounded-2xl bg-card p-5 space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-[15px] font-semibold text-foreground">Spending</h3>
         <div className="flex rounded-lg bg-muted p-0.5">

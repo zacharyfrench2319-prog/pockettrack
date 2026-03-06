@@ -15,8 +15,8 @@ const BottomNav = () => {
   const isOnScan = location.pathname === "/scan";
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 h-14 glass-nav bg-card/85 dark:bg-[rgba(28,28,33,0.85)] border-t border-[rgba(255,255,255,0.05)]">
-      <div className="flex h-full items-center justify-around px-3 max-w-md mx-auto relative">
+    <nav className="fixed bottom-0 left-0 right-0 z-40 glass-nav bg-card/80 dark:bg-[rgba(26,26,30,0.75)] pb-safe">
+      <div className="flex h-16 items-center justify-around px-3 max-w-md mx-auto relative">
         {/* First two tabs */}
         {tabs.slice(0, 2).map((tab) => {
           const isActive = location.pathname === tab.path;
@@ -25,10 +25,10 @@ const BottomNav = () => {
             <button
               key={tab.path}
               onClick={() => navigate(tab.path)}
-              className={`flex flex-col items-center justify-center gap-0.5 px-3 py-1.5 rounded-xl transition-colors ${
+              className={`flex flex-col items-center justify-center gap-0.5 px-3 py-1.5 rounded-xl transition-all ${
                 isActive
-                  ? "text-primary bg-primary/12"
-                  : "text-muted-foreground"
+                  ? "text-primary bg-primary/10"
+                  : "text-muted-foreground active:text-foreground"
               }`}
             >
               <Icon size={22} strokeWidth={isActive ? 2.2 : 1.8} />
@@ -43,7 +43,7 @@ const BottomNav = () => {
           className="flex flex-col items-center justify-center -mt-7"
           aria-label={isOnScan ? "Close scan" : "Scan"}
         >
-          <div className="w-14 h-14 rounded-full bg-foreground text-background flex items-center justify-center shadow-lg shadow-black/30 active:scale-95 transition-transform">
+          <div className="w-14 h-14 rounded-full bg-foreground text-background flex items-center justify-center shadow-lg shadow-foreground/15 active:scale-95 transition-transform">
             {isOnScan ? <X size={24} /> : <Camera size={24} />}
           </div>
         </button>
@@ -56,10 +56,10 @@ const BottomNav = () => {
             <button
               key={tab.path}
               onClick={() => navigate(tab.path)}
-              className={`flex flex-col items-center justify-center gap-0.5 px-3 py-1.5 rounded-xl transition-colors ${
+              className={`flex flex-col items-center justify-center gap-0.5 px-3 py-1.5 rounded-xl transition-all ${
                 isActive
-                  ? "text-primary bg-primary/12"
-                  : "text-muted-foreground"
+                  ? "text-primary bg-primary/10"
+                  : "text-muted-foreground active:text-foreground"
               }`}
             >
               <Icon size={22} strokeWidth={isActive ? 2.2 : 1.8} />
