@@ -11,10 +11,10 @@ import SubscriptionsList from "@/components/SubscriptionsList";
 import BudgetProgressCard from "@/components/BudgetProgressCard";
 import ScheduledTransactionsList from "@/components/ScheduledTransactionsList";
 import SetBudgetSheet from "@/components/SetBudgetSheet";
+import SpendingAnalytics from "@/components/SpendingAnalytics";
 import { TransactionListSkeleton } from "@/components/Skeletons";
 import { Plus, Search, ChevronDown, ChevronUp, Landmark, Target } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell } from "recharts";
-import { format, parseISO, startOfMonth } from "date-fns";
+import { parseISO, startOfMonth } from "date-fns";
 import PullToRefresh from "@/components/PullToRefresh";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { Button } from "@/components/ui/button";
@@ -179,23 +179,6 @@ const Spending = () => {
       .sort((a, b) => b.amount - a.amount);
   }, [transactions]);
 
-  const monthlyData = useMemo(() => {
-    const byMonth: Record<string, number> = {};
-    transactions
-      .filter((t) => t.type === "expense")
-      .forEach((t) => {
-        const key = format(parseISO(t.date), "yyyy-MM");
-        byMonth[key] = (byMonth[key] || 0) + t.amount;
-      });
-    return Object.entries(byMonth)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .slice(-6)
-      .map(([key, amount]) => ({
-        label: format(parseISO(key + "-01"), "MMM"),
-        amount,
-      }));
-  }, [transactions]);
-
   const filters: Array<{ key: FilterKey; label: string }> = [
     { key: "all", label: "All" },
     { key: "income", label: "Income" },
@@ -271,6 +254,11 @@ const Spending = () => {
       {/* Budget Progress */}
       {!isSubsTab && !isScheduledTab && (
         <BudgetProgressCard key={budgetRefreshKey} transactions={transactions} />
+      )}
+
+      {/* Spending Analytics */}
+      {(filter === "all" || filter === "expense") && (
+        <SpendingAnalytics transactions={transactions} />
       )}
 
       {/* SCHEDULED TAB */}
@@ -399,41 +387,6 @@ const Spending = () => {
             </div>
           )}
 
-          {/* Monthly Comparison */}
-          {monthlyData.length > 1 && (
-            <div className="space-y-3 animate-fade-in" style={{ animationDelay: "300ms", animationFillMode: "both" }}>
-              <h2 className="text-lg font-semibold text-foreground">Monthly Comparison</h2>
-              <div className="rounded-2xl bg-card p-5">
-                <div className="h-40">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={monthlyData} barCategoryGap="20%">
-                      <XAxis
-                        dataKey="label"
-                        axisLine={false}
-                        tickLine={false}
-                        tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                      />
-                      <YAxis hide />
-                      <Bar dataKey="amount" radius={[6, 6, 0, 0]} maxBarSize={36}>
-                        {monthlyData.map((entry, index) => (
-                          <Cell
-                            key={`cell-${index}`}
-                            fill="url(#monthlyPurple)"
-                          />
-                        ))}
-                      </Bar>
-                      <defs>
-                        <linearGradient id="monthlyPurple" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="hsl(263, 86%, 76%)" />
-                          <stop offset="100%" stopColor="hsl(263, 86%, 56%)" />
-                        </linearGradient>
-                      </defs>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-            </div>
-          )}
         </>
       )}
 
