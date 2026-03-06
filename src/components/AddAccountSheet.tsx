@@ -92,7 +92,7 @@ const AddAccountSheet = ({ open, onOpenChange, onSaved, editAccount }: AddAccoun
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="rounded-t-3xl bg-card border-0 max-h-[90dvh] overflow-y-auto px-6 sm:px-8 pb-8">
+      <SheetContent side="bottom" className="rounded-t-3xl bg-card border-0 max-h-[90dvh] overflow-y-auto px-6 sm:px-8 pb-8" onOpenAutoFocus={(e) => e.preventDefault()}>
         <SheetHeader className="pt-2 pb-4">
           <SheetTitle className="text-xl font-bold">{editAccount ? "Edit Account" : "Add Account"}</SheetTitle>
           <SheetDescription className="sr-only">Add or edit a financial account</SheetDescription>
