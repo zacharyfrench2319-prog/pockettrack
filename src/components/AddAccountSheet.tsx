@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,6 +26,13 @@ const AddAccountSheet = ({ open, onOpenChange, onSaved, editAccount }: AddAccoun
   const [type, setType] = useState("checking");
   const [balance, setBalance] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Scroll focused input into view when keyboard opens
+  const scrollOnFocus = useCallback((e: React.FocusEvent<HTMLInputElement>) => {
+    setTimeout(() => {
+      e.target.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 300);
+  }, []);
 
   useEffect(() => {
     if (editAccount) {
@@ -96,6 +103,7 @@ const AddAccountSheet = ({ open, onOpenChange, onSaved, editAccount }: AddAccoun
             placeholder="Account name"
             value={name}
             onChange={(e) => setName(e.target.value)}
+            onFocus={scrollOnFocus}
             className="h-12 rounded-xl bg-muted border-0 text-[15px] placeholder:text-muted-foreground"
           />
 
@@ -125,6 +133,7 @@ const AddAccountSheet = ({ open, onOpenChange, onSaved, editAccount }: AddAccoun
                 placeholder="0.00"
                 value={balance}
                 onChange={(e) => setBalance(e.target.value)}
+                onFocus={(e) => scrollOnFocus(e)}
                 className="text-4xl font-bold text-foreground bg-transparent border-0 outline-none text-center w-48 placeholder:text-muted-foreground/40"
               />
             </div>
