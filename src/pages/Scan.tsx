@@ -703,59 +703,57 @@ const Scan = () => {
     const verdict = VERDICT_STYLES[productResult.verdict] || VERDICT_STYLES.think_twice;
 
     return (
-      <div className="min-h-screen flex flex-col px-6 sm:px-8 pt-safe-top" style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 100px)" }}>
-        <button onClick={reset} className="flex items-center gap-2 text-muted-foreground mb-6">
+      <div className="px-6 sm:px-8 pt-safe-top pb-4 space-y-3" style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 80px)" }}>
+        <button onClick={reset} className="flex items-center gap-2 text-muted-foreground mb-4">
           <ArrowLeft size={20} /><span className="text-[15px]">Scan Again</span>
         </button>
 
-        <div className="space-y-4 flex-1">
-          {/* Product & Price */}
-          <div className="rounded-2xl bg-card p-5 text-center space-y-2">
-            <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Product Detected</p>
-            <h2 className="text-xl font-bold text-foreground">{productResult.product_name}</h2>
-            <p className="text-2xl font-bold text-foreground">
-              ${productResult.estimated_price.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-            </p>
-          </div>
-
-          {/* Verdict Badge */}
-          <div
-            className={`rounded-xl ${verdict.bg} p-4 text-center animate-fade-in`}
-            style={{ animationDelay: "200ms", animationFillMode: "both" }}
-          >
-            <p className={`text-lg font-bold ${verdict.text}`}>{verdict.label}</p>
-          </div>
-
-          {/* Reason */}
-          <div className="rounded-2xl bg-card p-5 space-y-2">
-            <p className="text-[15px] text-foreground leading-relaxed">{productResult.reason}</p>
-          </div>
-
-          {/* Cheaper Alternative */}
-          {productResult.cheaper_alternative && (
-            <div className="rounded-2xl bg-primary/10 p-4 flex items-start gap-3">
-              <Lightbulb size={18} className="text-primary mt-0.5 shrink-0" />
-              <div>
-                <p className="text-xs font-semibold text-primary uppercase tracking-wider mb-1">Try instead</p>
-                <p className="text-sm text-foreground">{productResult.cheaper_alternative}</p>
-              </div>
-            </div>
-          )}
-
-          {/* Financial Context Bar */}
-          <div className="rounded-2xl bg-muted/50 p-3">
-            <p className="text-[11px] text-muted-foreground text-center leading-relaxed">
-              Spent ${productResult.context.weekly_spend.toFixed(0)} this week
-              {" · "}Balance: ${productResult.context.balance.toFixed(0)}
-              {productResult.context.saving_for && productResult.context.saving_for !== "not specified" && (
-                <>{" · "}Saving for: {productResult.context.saving_for}</>
-              )}
-            </p>
-          </div>
+        {/* Product & Price */}
+        <div className="rounded-2xl bg-card p-5 text-center space-y-2">
+          <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Product Detected</p>
+          <h2 className="text-xl font-bold text-foreground">{productResult.product_name}</h2>
+          <p className="text-2xl font-bold text-foreground">
+            ${productResult.estimated_price.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+          </p>
         </div>
 
-        {/* Action Buttons — positioned above bottom nav */}
-        <div className="flex gap-3 mt-4">
+        {/* Verdict Badge */}
+        <div
+          className={`rounded-xl ${verdict.bg} p-3.5 text-center animate-fade-in`}
+          style={{ animationDelay: "200ms", animationFillMode: "both" }}
+        >
+          <p className={`text-lg font-bold ${verdict.text}`}>{verdict.label}</p>
+        </div>
+
+        {/* Reason */}
+        <div className="rounded-2xl bg-card p-4 space-y-2">
+          <p className="text-[15px] text-foreground leading-relaxed">{productResult.reason}</p>
+        </div>
+
+        {/* Cheaper Alternative */}
+        {productResult.cheaper_alternative && (
+          <div className="rounded-2xl bg-primary/10 p-3.5 flex items-start gap-3">
+            <Lightbulb size={18} className="text-primary mt-0.5 shrink-0" />
+            <div>
+              <p className="text-xs font-semibold text-primary uppercase tracking-wider mb-1">Try instead</p>
+              <p className="text-sm text-foreground">{productResult.cheaper_alternative}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Financial Context Bar */}
+        <div className="rounded-2xl bg-muted/50 p-2.5">
+          <p className="text-[11px] text-muted-foreground text-center leading-relaxed">
+            Spent ${productResult.context.weekly_spend.toFixed(0)} this week
+            {" · "}Balance: ${productResult.context.balance.toFixed(0)}
+            {productResult.context.saving_for && productResult.context.saving_for !== "not specified" && (
+              <>{" · "}Saving for: {productResult.context.saving_for}</>
+            )}
+          </p>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex gap-3 pt-1">
           <Button
             variant="outline"
             onClick={handleBoughtIt}

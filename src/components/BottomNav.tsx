@@ -16,7 +16,7 @@ const BottomNav = () => {
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 glass-nav bg-card/80 dark:bg-[rgba(26,26,30,0.75)] pb-safe">
-      <div className="flex h-16 items-center justify-around px-3 max-w-md mx-auto relative">
+      <div className="grid grid-cols-5 h-16 items-center max-w-md mx-auto">
         {/* First two tabs */}
         {tabs.slice(0, 2).map((tab) => {
           const isActive = location.pathname === tab.path;
@@ -25,7 +25,7 @@ const BottomNav = () => {
             <button
               key={tab.path}
               onClick={() => navigate(tab.path)}
-              className={`flex flex-col items-center justify-center gap-0.5 px-3 py-1.5 rounded-xl transition-all ${
+              className={`flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-xl transition-all ${
                 isActive
                   ? "text-primary bg-primary/10"
                   : "text-muted-foreground active:text-foreground"
@@ -37,10 +37,10 @@ const BottomNav = () => {
           );
         })}
 
-        {/* Centre scan button */}
+        {/* Centre scan button — always in middle column */}
         <button
           onClick={() => isOnScan ? navigate(-1) : navigate("/scan")}
-          className="flex flex-col items-center justify-center -mt-7"
+          className="flex items-center justify-center -mt-7"
           aria-label={isOnScan ? "Close scan" : "Scan"}
         >
           <div className="w-14 h-14 rounded-full bg-foreground text-background flex items-center justify-center shadow-lg shadow-foreground/15 active:scale-95 transition-transform">
@@ -56,7 +56,7 @@ const BottomNav = () => {
             <button
               key={tab.path}
               onClick={() => navigate(tab.path)}
-              className={`flex flex-col items-center justify-center gap-0.5 px-3 py-1.5 rounded-xl transition-all ${
+              className={`flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-xl transition-all ${
                 isActive
                   ? "text-primary bg-primary/10"
                   : "text-muted-foreground active:text-foreground"
